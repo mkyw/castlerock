@@ -132,14 +132,18 @@ class KBScraper:
             except Exception as e:
                 print(f"Error loading existing index: {e}")
                 print("Creating a new index...")
+        else:
+            print("No existing FAISS index found. Creating a new one...")
         
-        # Create a new empty FAISS index
-        print("Creating a new FAISS index...")
+        # Create a new empty FAISS index with a dummy document
+        print("Initializing new FAISS index...")
         self.vectorstore = FAISS.from_texts(
             texts=["Initial document"],
             embedding=self.embeddings,
             metadatas=[{"source": "system", "timestamp": datetime.now().isoformat()}]
         )
+        # Save the initial index
+        self.vectorstore.save_local(folder_path=str(self.persist_dir), index_name="index")
         print("Created a new FAISS index with one document.")
     
     def _handle_shutdown(self, signum, frame):
