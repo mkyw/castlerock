@@ -14,6 +14,8 @@ load_dotenv()
 ACCEPTED_TOKENS = [
     "generated-1752019096972",  # Original test token
     "generated-1752021165398",  # New token from logs
+    "generated-1752534699870",  # Latest token from logs
+    "generated-1752535111763",
     "test-token"                # Local development token
 ]
 ALGORITHM = "HS256"

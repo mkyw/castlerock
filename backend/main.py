@@ -23,11 +23,19 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI()
 
-# Initialize the scraper
-scraper = KBScraper(
-    persist_dir=os.path.join(Path(__file__).parent, "faiss_index"),
-    max_pages=1000000  # Limit to 100 pages by default for safety
-)
+# Dictionary to store user-specific scrapers
+user_scrapers = {}
+
+def get_scraper(user_id: str) -> KBScraper:
+    """Get or create a KBScraper instance for the user"""
+    # Ensure we're using the actual token as the user_id for Pinecone
+    if user_id not in user_scrapers:
+        print(f"Creating new scraper for user: {user_id}")
+        user_scrapers[user_id] = KBScraper(
+            user_id=user_id,
+            max_pages=1000000
+        )
+    return user_scrapers[user_id]
 
 # CORS middleware
 app.add_middleware(
@@ -80,34 +88,56 @@ class ProcessPDFRequest(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     print("Starting up KB RAG API...")
-    print(f"Scraper initialized: {scraper is not None}")
+    print("API is ready to handle requests")
 
 # Shutdown event
 @app.on_event("shutdown")
 async def shutdown_event():
     print("Shutting down KB RAG API...")
-    if hasattr(scraper, 'close'):
+    # Close all user scrapers with timeout
+    for user_id, scraper in list(user_scrapers.items()):
         try:
-            await scraper.close()
-            print("Scraper shutdown complete")
+            if hasattr(scraper, 'close'):
+                try:
+                    # Use timeout to avoid hanging
+                    await asyncio.wait_for(scraper.close(), timeout=10.0)
+                    print(f"Closed scraper for user {user_id}")
+                except asyncio.TimeoutError:
+                    print(f"Timeout closing scraper for user {user_id}, forcing shutdown")
+                    # Force cleanup
+                    if hasattr(scraper, '_cleanup_embeddings'):
+                        scraper._cleanup_embeddings()
+                    scraper._is_closed = True
+                    scraper.shutdown_requested = True
         except Exception as e:
-            print(f"Error during shutdown: {e}")
-    else:
-        print("Warning: RAG system does not have a shutdown method")
+            print(f"Error closing scraper for user {user_id}: {e}")
+    
+    # Force cleanup of any remaining resources
+    user_scrapers.clear()
+    print("Shutdown complete")
 
 # API Endpoints
 @app.post("/api/rag/process/website")
 async def process_website(
-    request: ProcessWebsiteRequest, 
+    request: ProcessWebsiteRequest,
     authorization: str = Header(None)
 ):
     """Process a website and add it to the knowledge base"""
-    # Verify token
-    if not authorization or not await verify_token(authorization.split(" ")[-1]):
+    # Verify token and get user ID
+    token = authorization.split(" ")[-1] if authorization else ""
+    if not await verify_token(token):
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     
+    # Use the token directly as the user_id for consistent index naming
+    user_id = token
+    
     try:
-        logger.info(f"Processing website: {request.url}")
+        logger.info(f"Processing website for user {user_id}: {request.url}")
+        
+        # Get the user's scraper instance
+        scraper = get_scraper(user_id)
+        
+        # Call the RAG system's process_website method
         result = await scraper.process_website(request.url)
         
         # Ensure the response has the expected format
@@ -134,26 +164,34 @@ async def process_pdf(
     authorization: str = Header(None)
 ):
     """Process a PDF file and add it to the knowledge base"""
-    # Verify token
-    if not authorization or not await verify_token(authorization.split(" ")[-1]):
+    # Verify token and get user ID
+    token = authorization.split(" ")[-1] if authorization else ""
+    if not await verify_token(token):
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     
+    # Use the token directly as the user_id for consistent index naming
+    user_id = token
+    
     try:
-        # Save the uploaded file temporarily
-        temp_dir = Path("temp_uploads")
-        temp_dir.mkdir(exist_ok=True)
+        logger.info(f"Processing PDF for user {user_id}: {file.filename}")
         
-        file_path = temp_dir / file.filename
+        # Save the uploaded file temporarily
+        file_path = f"temp_{file.filename}"
         with open(file_path, "wb") as f:
             f.write(await file.read())
         
-        # Process the PDF
-        result = await scraper.process_pdf(str(file_path))
-        
-        # Clean up the temporary file
-        file_path.unlink()
-        
-        return result
+            try:
+                # Get the user's scraper instance
+                scraper = get_scraper(user_id)
+                
+                # Process the PDF
+                result = await scraper.process_pdf(file_path)
+                return result
+                
+            finally:
+                # Clean up the temporary file in all cases
+                if os.path.exists(file_path):
+                    os.remove(file_path)
     except Exception as e:
         logger.error(f"Error processing PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
@@ -167,12 +205,19 @@ async def query_rag(
     authorization: str = Header(None)
 ):
     """Query the knowledge base"""
-    # Verify token
-    if not authorization or not await verify_token(authorization.split(" ")[-1]):
+    # Verify token and get user ID
+    token = authorization.split(" ")[-1] if authorization else ""
+    if not await verify_token(token):
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     
+    # Use the token directly as the user_id for consistent index naming
+    user_id = token
+    
     try:
-        logger.info(f"Processing query: {request.query}")
+        logger.info(f"Processing query for user {user_id}: {request.query}")
+        
+        # Get the user's scraper instance
+        scraper = get_scraper(user_id)
         
         # Call the RAG system's query method
         results = await scraper.query(request.query, request.k)

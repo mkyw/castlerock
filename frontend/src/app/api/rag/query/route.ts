@@ -7,16 +7,16 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
-    
+
     const accessToken = (session as any).accessToken;
-    
+
     if (!accessToken) {
       console.error('No access token found in session:', session);
       return NextResponse.json(
@@ -36,12 +36,12 @@ export async function POST(req: NextRequest) {
 
     // Debug logging
     console.log('Original accessToken:', accessToken);
-    
+
     // Make sure we don't add 'Bearer' prefix if it's already there
-    const authHeader = accessToken.startsWith('Bearer ') 
-      ? accessToken 
+    const authHeader = accessToken.startsWith('Bearer ')
+      ? accessToken
       : `Bearer ${accessToken}`;
-      
+
     console.log('Sending auth header:', authHeader);
 
     const response = await fetch(`${BACKEND_URL}/api/rag/query`, {
