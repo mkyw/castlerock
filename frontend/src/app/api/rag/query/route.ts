@@ -5,27 +5,16 @@ import { authOptions } from '@/lib/auth';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
-
-    const accessToken = (session as any).accessToken;
-
-    if (!accessToken) {
-      console.error('No access token found in session:', session);
-      return NextResponse.json(
-        { error: 'No authentication token found' },
-        { status: 401 }
-      );
-    }
-
-    const { query, k } = await req.json();
+    // Parse the request body
+    const body = await req.json();
+    const { query, k, index_name } = body;
 
     if (!query) {
       return NextResponse.json(
@@ -34,34 +23,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Debug logging
-    console.log('Original accessToken:', accessToken);
-
-    // Make sure we don't add 'Bearer' prefix if it's already there
-    const authHeader = accessToken.startsWith('Bearer ')
-      ? accessToken
-      : `Bearer ${accessToken}`;
-
-    console.log('Sending auth header:', authHeader);
-
-    const response = await fetch(`${BACKEND_URL}/api/rag/query`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-      },
-      body: JSON.stringify({ query, k: k || 5 }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
+    if (!index_name) {
       return NextResponse.json(
-        { error: data.error || 'Failed to process query' },
-        { status: response.status }
+        { error: 'index_name is required' },
+        { status: 400 }
       );
     }
 
+    // Get user email - backend uses email as the user ID in the JWT sub claim
+    const userEmail = session.user.email;
+
+    if (!userEmail) {
+      console.error('No user email found in session');
+      return NextResponse.json({ error: 'No user email found' }, { status: 401 });
+    }
+
+    // Get access token from session
+    const accessToken = (session as any).accessToken;
+
+    if (!accessToken) {
+      console.error('No access token found in session');
+      return NextResponse.json({ error: 'No access token found' }, { status: 401 });
+    }
+
+    // Forward the query to the backend
+    const response = await fetch(`${BACKEND_URL}/api/rag/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      console.error('Backend error:', response.status);
+      return NextResponse.json({ error: 'Failed to process query' }, { status: response.status });
+    }
+
+    const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error processing query:', error);

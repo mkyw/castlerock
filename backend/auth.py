@@ -1,29 +1,59 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from typing import Optional
 import os
 from dotenv import load_dotenv
+from pydantic import BaseModel
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
-# For development, we'll use a simple token verification
-# In production, you should use proper JWT with a secure secret key
-# This should match the format of the token being sent from the frontend
-ACCEPTED_TOKENS = [
-    "generated-1752019096972",  # Original test token
-    "generated-1752021165398",  # New token from logs
-    "generated-1752534699870",  # Latest token from logs
-    "generated-1752535111763",
-    "test-token"                # Local development token
-]
+# JWT Configuration
 ALGORITHM = "HS256"
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-please-change-in-production")
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours (60 min * 24)
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("JWT_SECRET_KEY environment variable is not set")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# Token models
+class TokenData(BaseModel):
+    sub: str  # user ID
+    email: Optional[str] = None
+    exp: Optional[int] = None
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    refresh_token: str
+
+oauth2_scheme = HTTPBearer(auto_error=False)
+
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Create a new JWT access token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire, "type": "access"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def create_refresh_token(data: Dict[str, Any]) -> str:
+    """Create a new JWT refresh token"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+async def get_token_payload(token: str) -> TokenData:
+    """Verify and decode a JWT token"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -31,25 +61,31 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     )
     
     try:
-        # Decode the JWT token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # In a real app, you might want to validate the token against a database here
-        return payload
-    except JWTError:
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            logger.warning("Token missing 'sub' claim")
+            raise credentials_exception
+        return TokenData(**payload)
+    except JWTError as e:
+        logger.warning(f"JWT validation error: {str(e)}")
         raise credentials_exception
 
-# Simple token verification for protected routes
-async def verify_token(token: str = Depends(oauth2_scheme)):
-    # For development, we'll check if the token matches any of our accepted tokens
-    print(f"Verifying token: {token}")
-    
-    # Handle both raw token and Bearer token
-    clean_token = token.replace("Bearer ", "") if token.startswith("Bearer ") else token
-    
-    if clean_token in ACCEPTED_TOKENS:
-        print("Token verification successful")
+async def get_current_user(token: Optional[HTTPAuthorizationCredentials] = Depends(oauth2_scheme)) -> Optional[TokenData]:
+    """Dependency to get the current user from the JWT token"""
+    if not token:
+        logger.debug("No token provided in request")
+        return None
+    try:
+        return await get_token_payload(token.credentials)
+    except HTTPException as e:
+        logger.warning(f"Token validation failed: {e.detail}")
+        return None
+
+async def verify_token(token: HTTPAuthorizationCredentials = Depends(oauth2_scheme)) -> bool:
+    """Verify that the token is valid"""
+    try:
+        await get_token_payload(token.credentials)
         return True
-    
-    print(f"Token verification failed. Got: {clean_token}")
-    print(f"Accepted tokens: {ACCEPTED_TOKENS}")
-    return False
+    except HTTPException:
+        return False

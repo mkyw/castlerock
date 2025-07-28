@@ -1,7 +1,20 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { handleAuthError } from '@/lib/auth-utils';
+import {
+  Box,
+  Typography,
+  Tabs,
+  Tab,
+  TextField,
+  Button,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  Paper
+} from '@mui/material';
 
 // Type for our session with accessToken
 type SessionWithToken = {
@@ -16,25 +29,40 @@ type SessionWithToken = {
 
 type SearchResult = {
   answer: string;
+  sources?: string[];
+  model_used?: string;
 };
 
-export default function RAGInterface() {
+interface RAGInterfaceProps {
+  indexName: string;
+}
+
+export default function RAGInterface({ indexName }: RAGInterfaceProps) {
   const { data: session } = useSession() as { data: SessionWithToken };
-  
-  // Debug log the session
-  console.log('RAGInterface - session:', session);
-  if (session) {
-    console.log('RAGInterface - accessToken exists:', 'accessToken' in session);
-    console.log('RAGInterface - session keys:', Object.keys(session));
-  }
-  const [activeTab, setActiveTab] = useState<'website' | 'pdf'>('website');
+  const [activeTab, setActiveTab] = useState<'website' | 'pdf' | 'query'>('query');
   const [url, setUrl] = useState('');
   const [query, setQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<string | null>(null);
-  const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Ensure indexName is provided
+  if (!indexName) {
+    return (
+      <Alert severity="error">
+        Error: No index specified. Please ensure you're accessing this page through a valid domain link.
+      </Alert>
+    );
+  }
+
+  useEffect(() => {
+    // Reset states when index changes
+    setSearchResult(null);
+    setQuery('');
+    setUrl('');
+  }, [indexName]);
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -42,8 +70,125 @@ export default function RAGInterface() {
   };
 
   const handleProcessWebsite = async () => {
-    if (!url) {
+    if (!url.trim()) {
       showMessage('error', 'Please enter a valid URL');
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(url.trim());
+    } catch (e) {
+      showMessage('error', 'Please enter a valid URL with http:// or https://');
+      return;
+    }
+
+    if (!session?.accessToken) {
+      showMessage('error', 'No authentication token found');
+      return;
+    }
+
+    console.log('Processing website with URL:', url.trim());
+    console.log('Index name:', indexName);
+    console.log('Session token available:', !!session.accessToken);
+
+    const requestBody = JSON.stringify({
+      url: url.trim(),
+      index_name: indexName // Pass the index name to the backend
+    });
+
+    console.log('Request body:', requestBody);
+
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/api/rag/process/website', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.accessToken}`,
+        },
+        body: requestBody,
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      if (!response.ok) {
+        // Handle authentication errors
+        const isAuthError = await handleAuthError(response);
+        if (isAuthError) {
+          showMessage('error', 'Authentication expired. Please log in again.');
+          return;
+        }
+
+        // Try to get detailed error information
+        let errorMessage = 'Failed to process website';
+        try {
+          const errorText = await response.text();
+          console.log('Error response text:', errorText);
+
+          if (errorText) {
+            try {
+              const parsedError = JSON.parse(errorText);
+              console.log('Parsed error:', parsedError);
+              errorMessage = parsedError.error || parsedError.detail || errorMessage;
+              if (parsedError.details) {
+                console.error('Error details:', parsedError.details);
+              }
+            } catch (jsonError) {
+              // If not JSON, use the raw text
+              console.log('Error parsing JSON:', jsonError);
+              errorMessage = errorText || errorMessage;
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      // Safely parse the successful response
+      let data;
+      try {
+        const responseText = await response.text();
+        console.log('Success response text:', responseText);
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        console.error('Error parsing successful response:', parseError);
+        throw new Error('Error parsing response from server');
+      }
+
+      showMessage('success', data.message || 'Website processed and added to knowledge base!');
+      setUrl('');
+    } catch (error) {
+      console.error('Error processing website:', error);
+      showMessage('error', error instanceof Error ? error.message : 'Failed to process website');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleProcessDocument = async () => {
+    if (!url.trim()) {
+      showMessage('error', 'Please enter a valid document URL');
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(url.trim());
+    } catch (e) {
+      showMessage('error', 'Please enter a valid URL with http:// or https://');
+      return;
+    }
+
+    // Check if the URL is for a supported document type
+    const supportedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.ppt', '.pptx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.csv'];
+    const isDocumentUrl = supportedExtensions.some(ext => url.toLowerCase().trim().endsWith(ext));
+
+    if (!isDocumentUrl) {
+      showMessage('error', 'URL must point to a supported document type: ' + supportedExtensions.join(', '));
       return;
     }
 
@@ -54,24 +199,64 @@ export default function RAGInterface() {
 
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/rag/process/website', {
+      const response = await fetch('/api/rag/process/document', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.accessToken}`,
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({
+          url: url.trim(),
+          index_name: indexName
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to process website');
+        // Handle authentication errors
+        const isAuthError = await handleAuthError(response);
+        if (isAuthError) {
+          showMessage('error', 'Authentication expired. Please log in again.');
+          return;
+        }
+
+        // Try to get detailed error information
+        let errorMessage = 'Failed to process document';
+        try {
+          const errorText = await response.text();
+          if (errorText) {
+            try {
+              const parsedError = JSON.parse(errorText);
+              errorMessage = parsedError.error || parsedError.detail || errorMessage;
+              if (parsedError.details) {
+                console.error('Error details:', parsedError.details);
+              }
+            } catch (jsonError) {
+              // If not JSON, use the raw text
+              errorMessage = errorText || errorMessage;
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      showMessage('success', data.message || 'Website processed successfully!');
+      // Safely parse the successful response
+      let data;
+      try {
+        const responseText = await response.text();
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        console.error('Error parsing successful response:', parseError);
+        throw new Error('Error parsing response from server');
+      }
+
+      showMessage('success', data.message || 'Document processed and added to knowledge base!');
+      setUrl('');
     } catch (error) {
-      console.error('Error processing website:', error);
-      showMessage('error', 'Failed to process website');
+      console.error('Error processing document:', error);
+      showMessage('error', error instanceof Error ? error.message : 'Failed to process document');
     } finally {
       setIsProcessing(false);
     }
@@ -89,6 +274,7 @@ export default function RAGInterface() {
     setIsProcessing(true);
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('index_name', indexName);
 
     try {
       const response = await fetch('/api/rag/process/pdf', {
@@ -100,7 +286,15 @@ export default function RAGInterface() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to process PDF');
+        // Handle authentication errors
+        const isAuthError = await handleAuthError(response);
+        if (isAuthError) {
+          showMessage('error', 'Authentication expired. Please log in again.');
+          return;
+        }
+
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to process PDF');
       }
 
       const data = await response.json();
@@ -133,40 +327,68 @@ export default function RAGInterface() {
     try {
       console.log('Session access token:', session.accessToken);
       console.log('Session keys:', Object.keys(session));
-      
+
       // Make sure the token doesn't already have 'Bearer ' prefix
-      const token = session.accessToken.startsWith('Bearer ') 
-        ? session.accessToken 
+      const token = session.accessToken.startsWith('Bearer ')
+        ? session.accessToken
         : `Bearer ${session.accessToken}`;
-        
+
       console.log('Sending search request with token:', token);
       console.log('Sending request to:', '/api/rag/query');
-      
+
       const response = await fetch('/api/rag/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': token,
         },
-        body: JSON.stringify({ query, k: 5 }),
+        body: JSON.stringify({
+          query,
+          k: 5,
+          index_name: indexName // Include the index name in the request
+        }),
       });
 
-      const responseData = await response.json();
-      
       if (!response.ok) {
+        // Handle authentication errors
+        const isAuthError = await handleAuthError(response);
+        if (isAuthError) {
+          showMessage('error', 'Authentication expired. Please log in again.');
+          return;
+        }
+
+        const responseData = await response.json();
         console.error('Search request failed:', {
           status: response.status,
           statusText: response.statusText,
           response: responseData
         });
         throw new Error(
-          responseData.message || 
+          responseData.message ||
           `Search failed with status ${response.status}: ${response.statusText}`
         );
       }
 
-      // Set the answer from the response
-      setSearchResult(responseData.answer || 'No response from the server');
+      const responseData = await response.json();
+      console.log('Search response data:', responseData);
+
+      // Check if the response has the expected structure
+      if (responseData.success) {
+        setSearchResult({
+          answer: responseData.answer || 'No answer provided',
+          sources: responseData.sources || [],
+          model_used: responseData.model_used
+        });
+
+        if (responseData.model_used) {
+          console.log('Model used for response:', responseData.model_used);
+        }
+      } else {
+        // Handle unsuccessful but non-error responses
+        const errorMessage = responseData.answer || responseData.error || 'Search returned no results';
+        showMessage('error', errorMessage);
+        setSearchResult(null);
+      }
     } catch (error) {
       console.error('Error searching:', error);
       const errorMessage = error instanceof Error ? error.message : 'Search failed';
@@ -178,180 +400,165 @@ export default function RAGInterface() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Add Knowledge Source</h2>
-        
-        {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('website')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'website'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+    <Box sx={{ width: '100%' }}>
+      <Tabs
+        value={activeTab}
+        onChange={(_, newValue) => setActiveTab(newValue)}
+        sx={{ mb: 3 }}
+      >
+        <Tab label="Query Knowledge Base" value="query" />
+        <Tab label="Add Website" value="website" />
+        <Tab label="Upload PDF" value="pdf" />
+      </Tabs>
+
+      {activeTab === 'query' && (
+        <Box>
+          <Box display="flex" gap={2} mb={3}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Ask a question about your documents..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              disabled={isSearching}
+              sx={{ flex: 1 }}
+            />
+            <Button
+              variant="contained"
+              onClick={handleSearch}
+              disabled={isSearching || !query.trim()}
+              sx={{ minWidth: 120 }}
             >
-              Website
-            </button>
-            <button
-              onClick={() => setActiveTab('pdf')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'pdf'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              PDF Document
-            </button>
-          </nav>
-        </div>
+              {isSearching ? <CircularProgress size={24} /> : 'Search'}
+            </Button>
+          </Box>
 
-        {/* Website Form */}
-        {activeTab === 'website' && (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
-                Website URL
-              </label>
-              <div className="flex space-x-2">
-                <input
-                  type="url"
-                  id="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com"
-                  className="flex-1 min-w-0 block w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-                <button
-                  onClick={handleProcessWebsite}
-                  disabled={isProcessing}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isProcessing ? 'Processing...' : 'Add Website'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          {searchResult && (
+            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>Answer:</Typography>
+              <Typography component="div" paragraph style={{ whiteSpace: 'pre-wrap' }}>{searchResult.answer}</Typography>
 
-        {/* PDF Form */}
-        {activeTab === 'pdf' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Upload PDF Document
-              </label>
-              <div className="mt-1 flex items-center">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="pdf-upload"
-                />
-                <label
-                  htmlFor="pdf-upload"
-                  className="cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Choose File
-                </label>
-                <span className="ml-3 text-sm text-gray-500">
-                  {fileInputRef.current?.files?.[0]?.name || 'No file chosen'}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Upload a PDF document to add to the knowledge base
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Search Section */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Search Knowledge Base</h2>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Ask a question or search for information..."
-            className="flex-1 min-w-0 block w-full px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-          <button
-            onClick={handleSearch}
-            disabled={isSearching}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSearching ? 'Searching...' : 'Search'}
-          </button>
-        </div>
-      </div>
-
-      {/* Results */}
-      {searchResult && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="prose max-w-none">
-            {searchResult.split('\n').map((paragraph, i) => (
-              <p key={i} className="mb-4">{paragraph}</p>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Message Alert */}
-      {message && (
-        <div
-          className={`p-4 rounded-md ${
-            message.type === 'success' ? 'bg-green-50' : 'bg-red-50'
-          }`}
-        >
-          <div className="flex">
-            <div className="flex-shrink-0">
-              {message.type === 'success' ? (
-                <svg
-                  className="h-5 w-5 text-green-400"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="h-5 w-5 text-red-400"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+              {searchResult.sources && searchResult.sources.length > 0 && (
+                <Box mt={2}>
+                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                    Sources:
+                  </Typography>
+                  <Box component="ul" sx={{ pl: 2, mt: 1 }}>
+                    {searchResult.sources.map((source, i) => (
+                      <Typography component="li" key={i} variant="body2">
+                        {source}
+                      </Typography>
+                    ))}
+                  </Box>
+                </Box>
               )}
-            </div>
-            <div className="ml-3">
-              <p
-                className={`text-sm font-medium ${
-                  message.type === 'success' ? 'text-green-800' : 'text-red-800'
-                }`}
-              >
-                {message.text}
-              </p>
-            </div>
-          </div>
-        </div>
+
+              {searchResult.model_used && (
+                <Box mt={2}>
+                  <Typography variant="caption" color="textSecondary">
+                    Generated by: {searchResult.model_used}
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          )}
+        </Box>
       )}
-    </div>
+
+      {activeTab === 'website' && (
+        <Box>
+          <Typography variant="h6" gutterBottom>Add Website to Knowledge Base</Typography>
+          <Box className="flex flex-col md:flex-row gap-4 mb-6">
+            <TextField
+              fullWidth
+              variant="outlined"
+              label="Website URL"
+              placeholder="https://example.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={isProcessing}
+              className="flex-grow"
+            />
+            <Box className="flex gap-2">
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleProcessWebsite}
+                disabled={isProcessing || !url.trim()}
+                startIcon={isProcessing ? <CircularProgress size={20} /> : null}
+                className="whitespace-nowrap"
+              >
+                Process Website
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={handleProcessDocument}
+                disabled={isProcessing || !url.trim()}
+                startIcon={isProcessing ? <CircularProgress size={20} /> : null}
+                className="whitespace-nowrap"
+                title="Process document URL directly (.pdf, .doc, etc.)"
+              >
+                Process Document
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      )}
+
+      {activeTab === 'pdf' && (
+        <Box>
+          <Typography variant="h6" gutterBottom>Upload PDF to Knowledge Base</Typography>
+          <Box
+            sx={{
+              border: '2px dashed',
+              borderColor: 'divider',
+              borderRadius: 2,
+              p: 4,
+              textAlign: 'center',
+              bgcolor: 'action.hover',
+              '&:hover': {
+                bgcolor: 'action.selected',
+                cursor: 'pointer'
+              },
+              mb: 2
+            }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".pdf"
+              style={{ display: 'none' }}
+            />
+            <Typography>Click to upload or drag and drop</Typography>
+            <Typography variant="caption" color="textSecondary">PDF (MAX. 10MB)</Typography>
+            {isProcessing && (
+              <Box mt={2} display="flex" alignItems="center" justifyContent="center" gap={1}>
+                <CircularProgress size={20} />
+                <Typography>Processing PDF...</Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      <Snackbar
+        open={!!message}
+        autoHideDuration={5000}
+        onClose={() => setMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setMessage(null)}
+          severity={message?.type || 'info'}
+          sx={{ width: '100%' }}
+        >
+          {message?.text}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 }

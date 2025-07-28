@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Demo Site</title>
+</head>
+
+<body>
+  <div id="root">
+  </div> <!-- Add this code before the closing </body> tag -->
+  <!-- Add this code before the closing </body> tag -->
+  <script>
+    // Configuration for the chatbot widget
+    window.chatbotConfig = {
+      "api": {
+        "baseUrl": "http://localhost:8000/api/rag/query",
+        "timeout": 30000
+      },
+      "ui": {
+        "buttonText": "💬",
+        "position": "bottom-right",
+        "primaryColor": "#4a90e2",
+        "textColor": "#000000",
+        "backgroundColor": "#ffffff",
+        "title": "doit",
+        "placeholder": "Type your message...",
+        "sendButtonText": "Send",
+        "zIndex": 9999
+      },
+      "behavior": {
+        "autoOpen": false,
+        "rememberSession": false,
+        "showTimestamp": true,
+        "debug": true
+      }
+    };
+
+    // Load the widget script
+    (function () {
+      const script = document.createElement('script');
+      script.src = "http://localhost:3000/widget/chatbot-widget-new.js";
+      script.async = true;
+      document.body.appendChild(script);
+    })();
+  </script>
+</body>
+
+</html>

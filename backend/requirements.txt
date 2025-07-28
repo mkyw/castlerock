@@ -14,3 +14,9 @@ langchain-core>=0.3.65,<1.0.0
 langchain-text-splitters>=0.0.2
 langchain-huggingface>=0.3.0
 packaging>=24.2,<25.0
+
+# Database
+sqlalchemy>=2.0.0,<3.0.0
+alembic>=1.13.1,<2.0.0
+python-dateutil>=2.8.2,<3.0.0
+pysqlite3-binary>=1.1.0,<2.0.0

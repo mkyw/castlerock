@@ -18,6 +18,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from pinecone_service import PineconeService
+from utils.document_processor import DocumentProcessor, SUPPORTED_DOCUMENT_EXTENSIONS
 
 # Import OpenAI at the top level
 try:
@@ -55,13 +56,14 @@ load_dotenv()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class KBScraper:
-    def __init__(self, max_pages: int = 100000, user_id: str = "default"):
+    def __init__(self, max_pages: int = 100000, user_id: str = "default", index_name: Optional[str] = None):
         """
         Initialize the KBScraper with Pinecone integration.
         
         Args:
             max_pages: Maximum number of pages to scrape
             user_id: Unique identifier for the user (used for namespacing in Pinecone)
+            index_name: Optional name for the Pinecone index (defaults to user-specific name)
         """
         # Initialize attributes that are used in __del__ first
         self._is_closed = False
@@ -80,10 +82,13 @@ class KBScraper:
             self.gemini_model = None
             self.gemini_model_name = None
             
-            # Initialize Pinecone service and embeddings
-            self.pinecone = PineconeService(user_id=user_id)
+            # Initialize Pinecone service and embeddings with the specified index name
+            self.pinecone = PineconeService(user_id=user_id, index_name=index_name)
             self.embeddings = None
             self._init_embeddings()
+            
+            # Initialize document processor for handling PDFs, DOCs, etc.
+            self.document_processor = DocumentProcessor(user_id=user_id, scraper=self)
             
             # No need for local vector store with Pinecone
             self.persist_dir = None
@@ -93,6 +98,7 @@ class KBScraper:
             
             # Initialize other attributes
             self.visited_urls = set()
+            self.document_urls = set()  # Track document URLs separately
             self.pages_to_visit = deque()  # Use deque for efficient FIFO operations
             self.batches_processed = 0  # Track number of processed batches
             self.documents_processed = 0  # Track number of processed documents
@@ -240,10 +246,13 @@ class KBScraper:
             if not all([parsed_url.scheme, parsed_url.netloc]):
                 return False
                 
-            # Skip non-HTTP/HTTPS URLs and file extensions we don't want to process
-            if (parsed_url.scheme not in ['http', 'https'] or
-                any(ext in url.lower() for ext in ['.pdf', '.jpg', '.jpeg', '.png', '.gif'])):
+            # Skip non-HTTP/HTTPS URLs
+            if parsed_url.scheme not in ['http', 'https']:
                 return False
+                
+            # Check if this is a document URL
+            path = parsed_url.path.lower()
+            is_document = any(path.endswith(ext) for ext in SUPPORTED_DOCUMENT_EXTENSIONS.keys())
                 
             # If base_domain is not set yet, this is the first URL being processed
             if self.base_domain is None:
@@ -252,9 +261,11 @@ class KBScraper:
                 
             # Check if the URL belongs to the same domain (including subdomains)
             url_domain = parsed_url.netloc
-            return (url_domain == self.base_domain or 
-                   url_domain.endswith('.' + self.base_domain) or
-                   ('.' + url_domain) in ('.' + self.base_domain))
+            same_domain = (url_domain == self.base_domain or 
+                          url_domain.endswith('.' + self.base_domain) or
+                          ('.' + url_domain) in ('.' + self.base_domain))
+                          
+            return same_domain
                     
         except Exception as e:
             print(f"Error validating URL {url}: {e}")
@@ -491,6 +502,18 @@ class KBScraper:
         max_retries = 3
         retry_delay = 1  # seconds
         
+        # Check if this is a document URL
+        if self.document_processor.is_document_url(url):
+            # If we haven't processed this document yet
+            if url not in self.document_urls:
+                # Queue the document for processing
+                self.document_urls.add(url)
+                await self.document_processor.queue_document(url, self.base_domain)
+                logger.info(f"Queued document URL for processing: {url}")
+            
+            # Return an empty result since we're handling this separately
+            return CrawlResult(url, None, [], None)
+        
         for attempt in range(max_retries):
             try:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
@@ -554,6 +577,8 @@ class KBScraper:
                     # Extract links with deduplication
                     links = []
                     seen_links = set()
+                    document_links = []
+                    
                     for link in soup.find_all('a', href=True):
                         try:
                             href = link['href'].strip()
@@ -570,15 +595,29 @@ class KBScraper:
                                 params=''
                             ).geturl()
                             
+                            # Check if this is a document URL
+                            is_document = self.document_processor.is_document_url(clean_url)
+                            
                             if (self.is_valid_url(clean_url) and 
                                 clean_url not in self.visited_urls and 
                                 clean_url not in seen_links):
-                                links.append(clean_url)
+                                
+                                if is_document:
+                                    if clean_url not in self.document_urls:
+                                        document_links.append(clean_url)
+                                else:
+                                    links.append(clean_url)
+                                
                                 seen_links.add(clean_url)
                         except Exception as e:
                             print(f"Error processing link {link.get('href', '')}: {e}")
                     
-                    print(f"Fetched {url} - Content length: {len(content) if content else 0} chars, Links found: {len(links)}")
+                    # Queue document links for processing
+                    for doc_url in document_links:
+                        self.document_urls.add(doc_url)
+                        await self.document_processor.queue_document(doc_url, self.base_domain)
+                    
+                    print(f"Fetched {url} - Content length: {len(content) if content else 0} chars, Links found: {len(links)}, Documents found: {len(document_links)}")
                     return CrawlResult(url, content, links)
                 
             except (asyncio.TimeoutError, aiohttp.ClientError) as e:
@@ -643,89 +682,68 @@ class KBScraper:
             raise
             
     async def close(self):
-        """Save the vector store and clean up"""
+        """Close the scraper and clean up resources"""
         if self._is_closed:
             return
-            
+        
+        self._is_closed = True
         self.shutdown_requested = True
         
+        logger.info("Closing KB scraper...")
+        
         try:
-            # Cancel the crawl task if it exists
+            # Cancel any running crawl task
             if hasattr(self, '_crawl_task') and not self._crawl_task.done():
-                print("Cancelling active crawl task...")
                 self._crawl_task.cancel()
                 try:
-                    await asyncio.wait_for(self._crawl_task, timeout=5.0)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
-                    print("Crawl task cancelled")
+                    await self._crawl_task
+                except asyncio.CancelledError:
+                    pass
             
-            # Cancel all running tasks with timeout
-            for task in self.tasks:
+            # Shut down the document processor
+            if hasattr(self, 'document_processor'):
+                await self.document_processor.shutdown()
+                logger.info("Document processor shut down")
+            
+            # Clear any remaining items in the queue
+            await self._clear_queues()
+            
+            # Cancel any remaining tasks
+            for task in list(self.tasks):
                 if not task.done():
                     task.cancel()
             
-            # Wait for tasks to complete with timeout
+            # Wait for tasks to complete
             if self.tasks:
-                try:
-                    await asyncio.wait_for(
-                        asyncio.gather(*self.tasks, return_exceptions=True),
-                        timeout=5.0  # 5 second timeout
-                    )
-                except asyncio.TimeoutError:
-                    print("Timeout waiting for tasks to complete during close")
-            
-            # Save the vector store if it exists, but with a timeout
-            if hasattr(self, 'vectorstore') and self.vectorstore is not None:
-                print("\nSaving final vector store state...")
-                try:
-                    # Use a simpler save approach to avoid hanging
-                    await asyncio.wait_for(
-                        asyncio.to_thread(
-                            self.vectorstore.save_local,
-                            folder_path=str(self.persist_dir),
-                            index_name="index"
-                        ),
-                        timeout=30.0  # 30 second timeout for saving
-                    )
-                    print(f"Final state saved successfully")
-                except (asyncio.TimeoutError, Exception) as e:
-                    print(f"Error during vector store save: {e}")
+                await asyncio.gather(*self.tasks, return_exceptions=True)
             
             # Clean up embeddings
             self._cleanup_embeddings()
             
-            # Clear queues and collections with timeout
-            try:
-                await asyncio.wait_for(self._clear_queues(), timeout=5.0)
-            except asyncio.TimeoutError:
-                print("Timeout clearing queues, forcing cleanup")
-            
-            # Clear collections
-            self.visited_urls.clear()
-            self.pages_to_visit.clear()
-            self.tasks.clear()
-            self.embedding_workers.clear()
-            
-            if hasattr(self, 'vectorstore') and self.vectorstore is not None:
-                try:
-                    del self.vectorstore
-                except Exception as e:
-                    print(f"Error cleaning up vector store: {e}")
-                self.vectorstore = None
-            
-            print("Cleanup complete.")
-            
-        finally:
-            self._is_closed = True
+            logger.info("KB scraper closed successfully")
+        except Exception as e:
+            logger.error(f"Error closing KB scraper: {e}")
+            # Continue with shutdown even if there are errors
     
     async def _clear_queues(self):
-        """Clear queues safely"""
-        while not self.doc_queue.empty():
-            try:
-                self.doc_queue.get_nowait()
-                self.doc_queue.task_done()
-            except asyncio.QueueEmpty:
-                break
+        """Clear all queues and collections"""
+        # Clear the document queue
+        try:
+            while not self.doc_queue.empty():
+                try:
+                    self.doc_queue.get_nowait()
+                    self.doc_queue.task_done()
+                except asyncio.QueueEmpty:
+                    break
+        except Exception as e:
+            logger.error(f"Error clearing document queue: {e}")
+        
+        # Clear collections
+        self.visited_urls.clear()
+        self.document_urls.clear()
+        self.pages_to_visit.clear()
+        
+        logger.info("All queues and collections cleared")
     
     async def process_website(self, url: str) -> Dict[str, Any]:
         """Process a website and add it to the knowledge base
@@ -756,6 +774,9 @@ class KBScraper:
                     "status": "info",
                     "message": f"URL {url} has already been processed"
                 }
+            
+            # Start the document processor if not already running
+            await self.document_processor.start_processing()
             
             # Start the crawling process if not already running
             if not crawl_in_progress:
@@ -791,51 +812,26 @@ class KBScraper:
             
             # Read the PDF file
             with open(file_path, 'rb') as file:
-                pdf_reader = PdfReader(file)
+                reader = PdfReader(file)
                 text = ""
-                for page in pdf_reader.pages:
-                    text += page.extract_text() + "\n\n"
-            
-            # Process the text as a document
-            doc = Document(
-                page_content=text,
-                metadata={"source": file_path}
-            )
-            
-            # Add to vector store
-            if not hasattr(self, 'vectorstore') or self.vectorstore is None:
-                self._load_vectorstore()
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
                 
-            self.vectorstore.add_documents([doc])
-            
-            # Save the updated vector store
-            self.vectorstore.save_local(folder_path=str(self.persist_dir), index_name="index")
-            
-            return {
-                "status": "success",
-                "message": f"Successfully processed PDF: {file_path}"
-            }
-            
+                # Process the extracted text
+                if not text.strip():
+                    return {"status": "error", "message": "No text could be extracted from the PDF"}
+                
+                # Add the document to the knowledge base
+                await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: self.process_document(file_path, text)
+                )
+                
+                return {"status": "success", "message": "PDF processed successfully"}
+                
         except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Failed to process PDF: {str(e)}"
-            }
-    
-    async def list_available_models(self):
-        """List all available models from the Gemini API"""
-        import google.generativeai as genai
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable is not set")
-        
-        genai.configure(api_key=api_key)
-        try:
-            models = genai.list_models()
-            return [model.name for model in models if 'generateContent' in model.supported_generation_methods]
-        except Exception as e:
-            print(f"Error listing models: {e}")
-            return []
+            logger.error(f"Error processing PDF: {str(e)}")
+            return {"status": "error", "message": f"Failed to process PDF: {str(e)}"}
     
     async def query(self, query: str, k: int = 5) -> Dict[str, Any]:
         """Query the knowledge base using OpenAI first, then fall back to Gemini if needed
@@ -894,7 +890,7 @@ class KBScraper:
 
                         If your answer is based on the provided context, include the most relevant source URL at the end of your reply."""
                     
-                    # Try GPT-4o-mini first, fall back to gpt-3.5-turbo if needed
+                    # Try models in order of preference
                     models_to_try = ["gpt-4o-mini", "gpt-3.5-turbo"]
                     last_openai_error = None
                     
@@ -927,170 +923,24 @@ class KBScraper:
                             
                     # If we get here, all OpenAI models failed
                     print(f"All OpenAI models failed. Last error: {last_openai_error}")
-                    print("Falling back to Gemini...")
+                    # Don't fall back to Gemini, return the error
+                    raise last_openai_error
                     
                 except Exception as e:
-                    print(f"OpenAI API initialization error: {e}")
-                    print("Falling back to Gemini...")
+                    print(f"OpenAI API error: {e}")
+                    # Return error message directly instead of falling back
+                    return {
+                        "status": "error",
+                        "answer": f"An error occurred while processing your query with OpenAI: {str(e)}",
+                        "sources": sources
+                    }
             else:
-                print("No OpenAI API key found, falling back to Gemini...")
-            
-            # If OpenAI failed or no API key, fall back to Gemini
-            # 4. Initialize Gemini model if not already done
-            if not hasattr(self, 'gemini_model'):
-                import google.generativeai as genai
-                api_key = os.getenv("GEMINI_API_KEY")
-                if not api_key:
-                    raise ValueError("GEMINI_API_KEY environment variable is not set")
-                
-                genai.configure(api_key=api_key)
-                
-                # Try to find the best available model
-                try:
-                    # Preferred models in order of preference
-                    preferred_models = [
-                        'gemini-1.5-flash-latest',
-                        'gemini-1.5-pro-latest',
-                        'gemini-pro',
-                    ]
-                    
-                    # Get available models
-                    available_models = [m.name.split('/')[-1] for m in genai.list_models()]
-                    
-                    # Find the first preferred model that's available
-                    model_name = next((m for m in preferred_models if m in available_models), None)
-                    
-                    if not model_name and available_models:
-                        # If no preferred model is found, use the first available model that supports text
-                        for m in available_models:
-                            if 'gemini' in m.lower() and 'vision' not in m.lower():
-                                model_name = m
-                                break
-                    
-                    if not model_name and available_models:
-                        # Last resort: use any available model
-                        model_name = available_models[0]
-                    
-                    if not model_name:
-                        raise RuntimeError("No suitable Gemini model found")
-                        
-                    print(f"Using Gemini model: {model_name}")
-                    self.gemini_model = genai.GenerativeModel(model_name)
-                except Exception as e:
-                    raise RuntimeError(f"Failed to initialize Gemini model: {str(e)}")
-            
-            # 5. Create prompt with context
-            prompt = f"""You are a knowledgeable IT support assistant. Use the following context to answer the question.
-            
-            Context:
-            {context}
-            
-            Question: {query}
-            
-            You are a knowledgeable, confident customer support assistant.
-
-            Speak with clarity and authority — your tone should instill trust.
-
-            Avoid vague or wishy-washy language. Do not use words like "maybe," "possibly," "I think," or "it appears." Always give the most direct, helpful answer possible.
-
-            The context below is your own knowledge: integrate it seamlessly into your answers.
-
-            If a question involves a tool or link, provide the direct URL.
-
-            Avoid acronyms and technical jargon unless absolutely necessary.
-
-            If the answer is in the context, respond with a clear and direct explanation based on that information.
-            If the answer is not in the context, use general knowledge and similar scenarios to offer the best possible solution — never say "I don't know."
-
-            If your answer is based on the provided context, include the most relevant source URL at the end of your reply."""
-            
-            # 6. Call Gemini API with fallback for rate limits
-            response = None
-            last_error = None
-            
-            # First try to get available models
-            available_models = await self.list_available_models()
-            print(f"Available models: {available_models}")
-            
-            # Define model preferences in order of preference
-            preferred_models = [
-                'gemini-1.5-flash',
-                'gemini-1.5-pro',
-                'gemini-1.0-pro',
-                'gemini-pro',
-            ]
-            
-            # Filter to only include available models, maintaining order
-            models_to_try = [model for model in preferred_models 
-                           if any(m.endswith(model) for m in available_models)]
-            
-            if not models_to_try and available_models:
-                # If no preferred models found but there are available models, use the first one
-                models_to_try = [available_models[0].split('/')[-1]]
-                
-            if not models_to_try:
-                # Fallback to common model names if no models are listed
-                models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-                
-            print(f"Trying models in this order: {models_to_try}")
-            
-            # If we already have a model, try it first
-            current_model = getattr(self, 'gemini_model_name', None)
-            if current_model and current_model in models_to_try:
-                models_to_try.remove(current_model)
-                models_to_try.insert(0, current_model)
-            
-            for model_name in models_to_try:
-                try:
-                    # If this isn't our current model, initialize it
-                    if not hasattr(self, 'gemini_model') or getattr(self, 'gemini_model_name', None) != model_name:
-                        import google.generativeai as genai
-                        api_key = os.getenv("GEMINI_API_KEY")
-                        if not api_key:
-                            raise ValueError("GEMINI_API_KEY environment variable is not set")
-                        
-                        genai.configure(api_key=api_key)
-                        self.gemini_model = genai.GenerativeModel(model_name)
-                        self.gemini_model_name = model_name
-                        print(f"Using Gemini model: {model_name}")
-                    
-                    # Try to make the API call
-                    response = await asyncio.to_thread(
-                        self.gemini_model.generate_content,
-                        prompt
-                    )
-                    break  # If we get here, the call was successful
-                    
-                except Exception as e:
-                    last_error = e
-                    # If it's a rate limit error, try the next model
-                    if '429' in str(e) or 'quota' in str(e).lower():
-                        print(f"Rate limit hit on {model_name}, trying next model...")
-                        continue
-                    # For other errors, re-raise
-                    raise
-            
-            # If we've tried all models and still no response
-            if response is None:
-                error_msg = "All models are rate limited or unavailable. "
-                if last_error:
-                    error_msg += f"Last error: {str(last_error)}"
-                raise RuntimeError(error_msg)
-            
-            # 7. Format response
-            result = {
-                "status": "success",
-                "answer": response.text,
-                "sources": sources,
-                "model_used": getattr(self, 'gemini_model_name', 'unknown')
-            }
-            
-            total_time = time.time() - start_time
-            print(f"\n=== Query Performance ===")
-            print(f"Total time: {total_time:.2f}s")
-            print("=======================\n")
-            
-            return result
+                print("No OpenAI API key found in environment variables")
+                return {
+                    "status": "error",
+                    "answer": "OpenAI API key is not configured. Please add your OpenAI API key to the environment variables.",
+                    "sources": sources
+                }
             
         except Exception as e:
             error_time = time.time() - start_time
@@ -1105,6 +955,39 @@ class KBScraper:
                 "sources": []
             }
     
+    def update_index_name(self, index_name: str):
+        """Update the index name for the scraper"""
+        if self.pinecone:
+            self.pinecone = PineconeService(user_id=self.user_id, index_name=index_name)
+            logger.info(f"Updated index name to: {index_name}")
+    
+    def get_index_name(self) -> str:
+        """Get the current index name"""
+        if self.pinecone:
+            return self.pinecone.index_name
+        return None
+
+    async def list_available_models(self) -> List[str]:
+        """Get a list of available Gemini models
+        
+        Returns:
+            List of model names
+        """
+        try:
+            import google.generativeai as genai
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                print("No GEMINI_API_KEY found in environment")
+                return []
+            
+            genai.configure(api_key=api_key)
+            models = await asyncio.to_thread(genai.list_models)
+            return [m.name for m in models]
+        except Exception as e:
+            print(f"Error listing Gemini models: {e}")
+            # Return empty list on error so we can fall back to default models
+            return []
+
     def __del__(self):
         """Ensure resources are cleaned up when the object is garbage collected"""
         if not getattr(self, '_is_closed', True) and not getattr(self, 'shutdown_requested', False):

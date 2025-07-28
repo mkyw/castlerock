@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth-utils";
+import { hashPassword, validatePassword } from "@/lib/auth-utils";
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +9,15 @@ export async function POST(request: Request) {
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email and password are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        { error: passwordValidation.message },
         { status: 400 }
       );
     }
@@ -27,7 +36,7 @@ export async function POST(request: Request) {
 
     // Create new user
     const hashedPassword = await hashPassword(password);
-    
+
     const user = await prisma.user.create({
       data: {
         email,

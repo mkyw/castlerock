@@ -1,45 +1,147 @@
 import os
-from typing import List, Dict, Any, Optional
+import logging
+from typing import List, Dict, Any, Optional, Union
 from dotenv import load_dotenv
+from pathlib import Path
 from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone, ServerlessSpec, NotFoundException
+
+# Local imports
+from utils.index_utils import generate_index_name, get_user_indices
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
 class PineconeService:
-    def __init__(self, user_id: str = "default"):
+    def __init__(self, user_id: str, index_name: Optional[str] = None, display_name: Optional[str] = None):
         """
         Initialize Pinecone service with user-specific settings.
         
         Args:
-            user_id: Unique identifier for the user (used for namespacing)
+            user_id: Unique identifier for the user (email)
+            index_name: Optional full name for the index (if None, will generate one)
+            display_name: Optional display name for the index (used if index_name is None)
         """
         self.user_id = user_id
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.dimension = 384  # Dimension for all-MiniLM-L6-v2
         
-        # Initialize Pinecone
+        # If index_name is provided, use it directly, otherwise generate one
+        if index_name is None:
+            self.index_name, _ = generate_index_name(user_id, display_name or 'default')
+        else:
+            self.index_name = index_name
+        
+        # Initialize Pinecone connection
         self._init_pinecone()
+    
+    @classmethod
+    def get_user_indices(cls, user_id: str) -> List[Dict[str, Any]]:
+        """Get all indices for a user.
+        
+        Args:
+            user_id: The user's unique identifier
+            
+        Returns:
+            List of index information dictionaries
+        """
+        api_key = os.getenv("PINECONE_API_KEY")
+        if not api_key:
+            raise ValueError("PINECONE_API_KEY environment variable is not set")
+            
+        pc = Pinecone(api_key=api_key)
+        user_indices = []
+        
+        # Get all indices and filter for this user's indices
+        for index in pc.list_indexes():
+            # Match indices that follow the pattern: castlerock-{user_hash}-{index_name}
+            if index.name.startswith(f"castlerock-{get_user_hash(user_id)}-"):
+                # Extract the custom index name part
+                index_name_parts = index.name.split('-')
+                custom_name = '-'.join(index_name_parts[2:]) if len(index_name_parts) > 2 else 'default'
+                
+                user_indices.append({
+                    'name': index.name,
+                    'display_name': custom_name,
+                    'dimension': index.dimension,
+                    'metric': index.metric,
+                    'status': index.status.state,
+                    'created_at': getattr(index, 'created_at', None)
+                })
+                
+        return user_indices
+        
+    def _generate_index_name(self, custom_name: Optional[str] = None) -> str:
+        """Generate a standard index name for a user.
+        
+        Args:
+            custom_name: Optional custom name for the index
+            
+        Returns:
+            Formatted index name
+        """
+        # Use the utility function to generate the index name
+        index_name, _ = generate_index_name(self.user_id, custom_name or 'default')
+        return index_name
         
     def _init_pinecone(self):
         """Initialize Pinecone connection and index"""
         # Get config from environment
         api_key = os.getenv("PINECONE_API_KEY")
-        environment = os.getenv("PINECONE_ENV", "gcp-starter")
-        index_name = f"{os.getenv('PINECONE_INDEX_NAME', 'knowledge-base')}-{self.user_id}"
-        
         if not api_key:
             raise ValueError("PINECONE_API_KEY environment variable is not set")
             
         # Initialize Pinecone client
         self.pc = Pinecone(api_key=api_key)
         
-        # Create index if it doesn't exist
-        if index_name not in [index.name for index in self.pc.list_indexes()]:
+        # Check if index exists, create if it doesn't
+        logger.info(f"Initializing Pinecone service for index: {self.index_name}")
+        self._ensure_index_exists()
+        
+        # Connect to the index
+        self.index = self.pc.Index(self.index_name)
+    
+    def _ensure_index_exists(self):
+        """Ensure the index exists, create it if it doesn't"""
+        try:
+            # First, try to directly describe the index - this is faster than listing all indices
+            try:
+                status = self.pc.describe_index(self.index_name)
+                logger.info(f"Index {self.index_name} already exists")
+                return True
+            except Exception as e:
+                # If the index doesn't exist, we'll get an exception
+                if "not found" not in str(e).lower() and "resource not found" not in str(e).lower():
+                    # If it's some other error, re-raise it
+                    raise
+                
+                # Index doesn't exist, create it
+                logger.info(f"Index {self.index_name} not found, creating it")
+                self._create_index()
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error in _ensure_index_exists: {str(e)}")
+            # If we get here, there was an error with describe_index or _create_index
+            # Let's try to be more specific about the error
+            if "already exists" in str(e).lower() or "already_exists" in str(e).lower():
+                logger.info(f"Index {self.index_name} already exists (from exception)")
+                return True
+            raise
+    
+    def _create_index(self):
+        """Create a new index for the user"""
+        try:
+            # Try to create the index directly
+            logger.info(f"Creating new index: {self.index_name}")
+            
+            # Create the index with the specified name
             self.pc.create_index(
-                name=index_name,
+                name=self.index_name,
                 dimension=self.dimension,
                 metric="cosine",
                 spec=ServerlessSpec(
@@ -47,9 +149,44 @@ class PineconeService:
                     region='us-east-1'  # Free tier supported region
                 )
             )
-        
-        # Connect to the index
-        self.index = self.pc.Index(index_name)
+            
+            # Wait for the index to be ready
+            import time
+            max_attempts = 60  # 60 seconds max wait
+            attempts = 0
+            
+            while attempts < max_attempts:
+                try:
+                    status = self.pc.describe_index(self.index_name)
+                    if status.status.ready:
+                        logger.info(f"Index {self.index_name} is ready")
+                        return
+                    time.sleep(1)
+                    attempts += 1
+                except Exception as e:
+                    logger.warning(f"Error checking index status (attempt {attempts + 1}/{max_attempts}): {e}")
+                    time.sleep(1)
+                    attempts += 1
+            
+            logger.warning(f"Timed out waiting for index {self.index_name} to be ready")
+            
+        except Exception as e:
+            # Handle the case where index already exists
+            if "already exists" in str(e).lower() or "already_exists" in str(e).lower():
+                logger.info(f"Index {self.index_name} already exists, skipping creation")
+                return
+            # Re-raise any other exceptions
+            logger.error(f"Error creating index {self.index_name}: {e}")
+            raise
+    
+    def delete_index(self):
+        """Delete the current index"""
+        try:
+            self.pc.delete_index(self.index_name)
+            return True
+        except Exception as e:
+            print(f"Error deleting index {self.index_name}: {str(e)}")
+            return False
     
     def upsert_document(self, text: str, metadata: Dict[str, Any]) -> None:
         """

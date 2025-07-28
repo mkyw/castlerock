@@ -1,6 +1,17 @@
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
-export default function Hero() {
+// Dynamically import the EmbedCodeSnippet component with SSR disabled
+const EmbedCodeSnippet = dynamic(
+  () => import('@/components/EmbedCodeSnippet'),
+  { ssr: false }
+);
+
+interface HeroProps {
+  showEmbedCode?: boolean;
+}
+
+export default function Hero({ showEmbedCode = false }: HeroProps) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl text-center">
@@ -27,6 +38,12 @@ export default function Hero() {
             See Demo
           </Link>
         </div>
+        
+        {showEmbedCode && (
+          <div className="mt-20 max-w-4xl mx-auto">
+            <EmbedCodeSnippet />
+          </div>
+        )}
       </div>
     </div>
   );

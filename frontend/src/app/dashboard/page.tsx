@@ -1,27 +1,25 @@
 'use client';
 
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Suspense, useEffect } from 'react';
-import dynamic from 'next/dynamic';
+import IndexList from '@/components/IndexList';
+import SessionValidator from '@/components/SessionValidator';
 
-// Dynamically import the RAGInterface component with no SSR
-const RAGInterface = dynamic(
-  () => import('@/components/RAGInterface'),
-  { ssr: false }
-);
-
-function DashboardContent() {
+export default function Dashboard() {
   const { data: session, status } = useSession();
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
+    } else if (status === 'authenticated') {
+      setIsLoading(false);
     }
   }, [status, router]);
 
-  if (status === 'loading' || status === 'unauthenticated') {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -30,37 +28,24 @@ function DashboardContent() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 max-w-6xl">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Knowledge Base</h1>
-          <p className="text-gray-600">
-            Welcome back, <span className="font-semibold">{session?.user?.name || 'User'}</span>!
-          </p>
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <SessionValidator />
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Knowledge Bases
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+              Manage your knowledge bases and create new ones
+            </p>
+          </div>
+
+          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+            <IndexList />
+          </div>
         </div>
-        <button
-          onClick={() => signOut({ callbackUrl: '/' })}
-          className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm md:text-base"
-        >
-          Sign Out
-        </button>
-      </div>
-      
-      <div className="space-y-6">
-        <RAGInterface />
       </div>
     </div>
-  );
-}
-
-export default function DashboardPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    }>
-      <DashboardContent />
-    </Suspense>
   );
 }
