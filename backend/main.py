@@ -12,10 +12,16 @@ import json
 import logging
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uvicorn
 from urllib.parse import urlparse
 from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Constants
+ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Token expiration time in minutes
 
 # Local imports
 from auth import get_current_user, TokenData
@@ -64,9 +70,6 @@ from models.index_models import (
     UserIndexCreate,
     UserIndexUpdate
 )
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -196,13 +199,25 @@ class QueryRequest(BaseModel):
         None, 
         description="Name of the index to query (defaults to user's default index)"
     )
+    conversation_history: Optional[List[Dict[str, str]]] = Field(
+        None,
+        description="List of previous messages in the conversation, each with 'role' and 'content'"
+    )
+    context_documents: Optional[List[str]] = Field(
+        None,
+        description="List of document contents to use as additional context"
+    )
     
     class Config:
         json_schema_extra = {
             "example": {
                 "query": "What is RAG?",
                 "k": 5,
-                "index_name": "castlerock-abc123-my-index"
+                "index_name": "castlerock-abc123-my-index",
+                "conversation_history": [
+                    {"role": "user", "content": "What are the different wifi networks?"},
+                    {"role": "assistant", "content": "There are three networks: eduroam, UWNet, and WiscVPN."}
+                ]
             }
         }
 
@@ -349,7 +364,7 @@ async def login(user_data: UserLogin):
             "email": user_data.email,
             "name": user_data.email.split('@')[0],
             "is_active": True,
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
     }
 
@@ -377,7 +392,7 @@ async def refresh_access_token(request: RefreshTokenRequest):
             )
             
         # Check if token is expired
-        if datetime.utcnow().timestamp() > payload.get("exp", 0):
+        if datetime.now(timezone.utc).timestamp() > payload.get("exp", 0):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Refresh token has expired",
@@ -416,7 +431,7 @@ async def read_current_user(current_user: TokenData = Depends(get_current_user))
     return {
         "id": current_user.sub,
         "email": current_user.email,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "is_active": True
     }
 
@@ -433,7 +448,7 @@ async def list_users(current_user: TokenData = Depends(get_current_user)):
     return [{
         "id": current_user.sub,
         "email": current_user.email,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "is_active": True
     }]
 
@@ -615,7 +630,7 @@ async def list_indices(
                 "name": idx.get('name', ''),
                 "display_name": idx.get('display_name', 'Unnamed'),
                 "document_count": idx.get('document_count', 0),
-                "created_at": idx.get('created_at', datetime.utcnow().isoformat()),
+                "created_at": idx.get('created_at', datetime.now(timezone.utc).isoformat()),
                 "updated_at": idx.get('updated_at'),
                 "status": idx.get('status', 'active')
             }
@@ -673,7 +688,7 @@ async def create_index_route(
             index_name=index_name,
             updates={
                 'status': 'creating',
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now(timezone.utc).isoformat()
             }
         )
         
@@ -686,7 +701,7 @@ async def create_index_route(
                 index_name=index_name,
                 updates={
                     'status': 'active',
-                    'updated_at': datetime.utcnow().isoformat()
+                    'updated_at': datetime.now(timezone.utc).isoformat()
                 }
             )
             
@@ -696,7 +711,7 @@ async def create_index_route(
                 "display_name": display_name,  # Return the original display name
                 "document_count": 0,
                 "created_at": index_meta['created_at'],
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
                 "status": "active"
             }
             
@@ -706,7 +721,7 @@ async def create_index_route(
                 index_name=index_name,
                 updates={
                     'status': 'error',
-                    'updated_at': datetime.utcnow().isoformat(),
+                    'updated_at': datetime.now(timezone.utc).isoformat(),
                     'error': str(e)
                 }
             )
@@ -755,7 +770,7 @@ async def get_index(
             name=index_meta['name'],
             display_name=index_meta.get('display_name', 'Unnamed'),
             document_count=index_meta.get('document_count', 0),
-            created_at=index_meta.get('created_at', datetime.utcnow().isoformat()),
+            created_at=index_meta.get('created_at', datetime.now(timezone.utc).isoformat()),
             updated_at=index_meta.get('updated_at'),
             status=index_meta.get('status', IndexStatus.ACTIVE)
         )
@@ -796,7 +811,7 @@ async def update_index(
             
         # Prepare updates
         update_data = {
-            'updated_at': datetime.utcnow().isoformat()
+            'updated_at': datetime.now(timezone.utc).isoformat()
         }
         
         # Only include fields that were provided in the request
@@ -810,7 +825,7 @@ async def update_index(
             name=updated_meta['name'],
             display_name=updated_meta.get('display_name', 'Unnamed'),
             document_count=updated_meta.get('document_count', 0),
-            created_at=updated_meta.get('created_at', datetime.utcnow().isoformat()),
+            created_at=updated_meta.get('created_at', datetime.now(timezone.utc).isoformat()),
             updated_at=updated_meta.get('updated_at'),
             status=updated_meta.get('status', IndexStatus.ACTIVE)
         )
@@ -854,13 +869,13 @@ async def delete_index(
             index_name=index_name,
             updates={
                 'status': IndexStatus.DELETING,
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now(timezone.utc).isoformat()
             }
         )
         
         try:
             # First remove from our metadata store to prevent any race conditions
-            delete_user_index_util(current_user.sub, index_name)
+            delete_user_index(current_user.sub, index_name)
             
             try:
                 # Then delete from Pinecone
@@ -891,7 +906,7 @@ async def delete_index(
                 index_name=index_name,
                 updates={
                     'status': IndexStatus.ERROR,
-                    'updated_at': datetime.utcnow().isoformat(),
+                    'updated_at': datetime.now(timezone.utc).isoformat(),
                     'error': str(e)
                 }
             )
@@ -973,9 +988,20 @@ async def query_rag(
         
         # Process the query using the scraper (which will use the LLM)
         logger.info(f"Processing query with LLM: {query_data.query}")
+        
+        # Check if we have conversation history
+        if query_data.conversation_history:
+            logger.info(f"Conversation history provided with {len(query_data.conversation_history)} messages")
+        
+        # Check if we have context documents
+        if query_data.context_documents:
+            logger.info(f"Context documents provided: {len(query_data.context_documents)}")
+        
         llm_results = await scraper.query(
             query=query_data.query,
-            k=query_data.k
+            k=query_data.k,
+            conversation_history=query_data.conversation_history,
+            context_documents=query_data.context_documents
         )
         
         logger.info(f"Query completed successfully for user {user_id}")
@@ -1017,7 +1043,7 @@ async def debug_token(current_user: TokenData = Depends(get_current_user)):
         "email": current_user.email,
         "exp": current_user.exp,
         "token_valid": True,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 if __name__ == "__main__":

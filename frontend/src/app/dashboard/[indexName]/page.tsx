@@ -162,11 +162,27 @@ function KnowledgeBasePage() {
 
         <TabPanel value={activeTab} index={1}>
           <Paper className="p-4">
-            <Typography variant="h6" gutterBottom>Website Integration</Typography>
-            <Typography variant="body2" color="text.secondary" className="mb-4">
-              Add this chat widget to your website by copying the code below:
+            <Typography variant="h6" gutterBottom>
+              Add Chatbot to Your Website
+            </Typography>
+            <Typography variant="body1" paragraph>
+              Copy and paste this code into your website's HTML to add the chatbot widget.
+              The widget will automatically connect to your "{indexName}" knowledge base.
             </Typography>
             <EmbedSnippet indexName={decodedIndexName} />
+
+
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
+              <Typography variant="subtitle1" color="text.primary" gutterBottom>
+                Quick Tips:
+              </Typography>
+              <ul style={{ margin: '0 0 0 20px', padding: 0, color: 'text.primary' }}>
+                <li>Place this code before the <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: 4 }}>&lt;/body&gt;</code> tag.</li>
+                <li>Paste once and forget - your website will automatically get the latest chatbot version.</li>
+                <li>The widget will automatically connect to your knowledge base</li>
+                <li>The widget inherits your website's colors by default</li>
+              </ul>
+            </Box>
           </Paper>
         </TabPanel>
 

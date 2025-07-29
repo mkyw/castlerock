@@ -39,7 +39,7 @@ interface RAGInterfaceProps {
 
 export default function RAGInterface({ indexName }: RAGInterfaceProps) {
   const { data: session } = useSession() as { data: SessionWithToken };
-  const [activeTab, setActiveTab] = useState<'website' | 'pdf' | 'query'>('query');
+  const [activeTab, setActiveTab] = useState<'website' | 'pdf' | 'query'>('website');
   const [url, setUrl] = useState('');
   const [query, setQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -406,9 +406,9 @@ export default function RAGInterface({ indexName }: RAGInterfaceProps) {
         onChange={(_, newValue) => setActiveTab(newValue)}
         sx={{ mb: 3 }}
       >
-        <Tab label="Query Knowledge Base" value="query" />
         <Tab label="Add Website" value="website" />
         <Tab label="Upload PDF" value="pdf" />
+        <Tab label="Query Knowledge Base" value="query" />
       </Tabs>
 
       {activeTab === 'query' && (
@@ -490,17 +490,6 @@ export default function RAGInterface({ indexName }: RAGInterfaceProps) {
                 className="whitespace-nowrap"
               >
                 Process Website
-              </Button>
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={handleProcessDocument}
-                disabled={isProcessing || !url.trim()}
-                startIcon={isProcessing ? <CircularProgress size={20} /> : null}
-                className="whitespace-nowrap"
-                title="Process document URL directly (.pdf, .doc, etc.)"
-              >
-                Process Document
               </Button>
             </Box>
           </Box>
