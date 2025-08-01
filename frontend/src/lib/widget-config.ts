@@ -19,7 +19,7 @@ export function generateEmbedCode(widgetUrl: string, customConfig?: Record<strin
             timeout: 30000
         },
         ui: {
-            buttonText: '💬 Chat',
+            buttonText: '💬',
             position: 'bottom-right',
             primaryColor: '#4a90e2',
             textColor: '#000000',
@@ -31,7 +31,7 @@ export function generateEmbedCode(widgetUrl: string, customConfig?: Record<strin
         },
         behavior: {
             autoOpen: false,
-            rememberSession: true,
+            rememberSession: false,
             showTimestamp: true,
             debug: process.env.NODE_ENV === 'development'
         }
@@ -135,4 +135,13 @@ export const customizationOptions = [
     { name: 'behavior.autoOpen', description: 'true/false to open chat automatically' },
     { name: 'behavior.rememberSession', description: 'true/false to remember chat history' },
     { name: 'api.baseUrl', description: 'API endpoint URL' }
-]; 
+];
+
+// Backend URL for API calls
+export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+
+// C# Chat Service URL
+export const CHAT_SERVICE_URL = process.env.NEXT_PUBLIC_CHAT_SERVICE_URL || 'http://localhost:5000';
+
+// WebSocket URL for chat connections
+export const BACKEND_WS_URL = process.env.NEXT_PUBLIC_BACKEND_WS_URL || 'ws://localhost:8765'; 

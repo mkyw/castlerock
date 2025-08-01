@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 import uvicorn
 from urllib.parse import urlparse
 from dotenv import load_dotenv
+import httpx
 
 # Load environment variables from .env file
 load_dotenv()
@@ -75,19 +76,15 @@ from models.index_models import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
-app = FastAPI()
+# Create the FastAPI app
+app = FastAPI(title="CastleRock API")
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
-
-# Include routers
-app.include_router(domain_auth.router)
-
+# CORS configuration
 # Function to get all whitelisted domains for CORS
 def get_all_whitelisted_domains():
     try:
         # Get all domain links
+        from services.domain_auth_service import DomainAuthService
         domain_links = DomainAuthService._load_domain_links()
         
         # Extract unique domains
@@ -113,6 +110,7 @@ def get_all_whitelisted_domains():
             "http://localhost:3000",
             "http://localhost:3001",
             "http://localhost:8000",
+            "http://localhost:5000",
             "https://localhost",
             "https://localhost:3000"
         ]
@@ -129,9 +127,20 @@ def get_all_whitelisted_domains():
             "http://localhost:3000",
             "http://localhost:3001",
             "http://localhost:8000",
+            "http://localhost:5000",
             "https://localhost",
             "https://localhost:3000"
         ]
+
+# Apply CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_all_whitelisted_domains(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
 # Add domain authentication middleware
 app.add_middleware(
@@ -153,15 +162,11 @@ def get_scraper(user_id: str) -> KBScraper:
         )
     return user_scrapers[user_id]
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=get_all_whitelisted_domains(),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+# Include routers
+app.include_router(domain_auth.router)
 
 # Root route
 @app.get("/")
@@ -1045,6 +1050,128 @@ async def debug_token(current_user: TokenData = Depends(get_current_user)):
         "token_valid": True,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+# Add the proxy routes to the C# Chat Service
+@app.get("/api/chat/stats")
+async def proxy_chat_stats(request: Request, current_user: TokenData = Depends(get_current_user)):
+    """Proxy endpoint for chat statistics from C# service"""
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{CHAT_SERVICE_URL}/api/chat/stats",
+                headers={"Authorization": f"Bearer {current_user.token}"}
+            )
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+        except Exception as e:
+            logger.error(f"Error proxying to chat service: {e}")
+            return JSONResponse(
+                content={"error": "Failed to connect to chat service"},
+                status_code=500
+            )
+
+@app.get("/api/chat/active")
+async def proxy_active_chats(
+    request: Request, 
+    status: Optional[str] = None,
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Proxy endpoint for active chats from C# service"""
+    async with httpx.AsyncClient() as client:
+        try:
+            url = f"{CHAT_SERVICE_URL}/api/chat/active"
+            if status:
+                url += f"?status={status}"
+                
+            response = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {current_user.token}"}
+            )
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+        except Exception as e:
+            logger.error(f"Error proxying to chat service: {e}")
+            return JSONResponse(
+                content={"error": "Failed to connect to chat service"},
+                status_code=500
+            )
+
+@app.post("/api/chat/assign-agent")
+async def proxy_assign_agent(request: Request, current_user: TokenData = Depends(get_current_user)):
+    """Proxy endpoint for assigning an agent from C# service"""
+    body = await request.body()
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{CHAT_SERVICE_URL}/api/chat/assign-agent",
+                headers={
+                    "Authorization": f"Bearer {current_user.token}",
+                    "Content-Type": "application/json"
+                },
+                content=body
+            )
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+        except Exception as e:
+            logger.error(f"Error proxying to chat service: {e}")
+            return JSONResponse(
+                content={"error": "Failed to connect to chat service"},
+                status_code=500
+            )
+
+@app.get("/api/chat/history/{index_name}/{connection_id}")
+async def proxy_chat_history(
+    request: Request, 
+    index_name: str,
+    connection_id: str,
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Proxy endpoint for chat history from C# service"""
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{CHAT_SERVICE_URL}/api/chat/history/{index_name}/{connection_id}",
+                headers={"Authorization": f"Bearer {current_user.token}"}
+            )
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+        except Exception as e:
+            logger.error(f"Error proxying to chat service: {e}")
+            return JSONResponse(
+                content={"error": "Failed to connect to chat service"},
+                status_code=500
+            )
+
+@app.post("/api/chat/end/{index_name}/{connection_id}")
+async def proxy_end_chat(
+    request: Request, 
+    index_name: str,
+    connection_id: str,
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Proxy endpoint for ending a chat from C# service"""
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{CHAT_SERVICE_URL}/api/chat/end/{index_name}/{connection_id}",
+                headers={"Authorization": f"Bearer {current_user.token}"}
+            )
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+        except Exception as e:
+            logger.error(f"Error proxying to chat service: {e}")
+            return JSONResponse(
+                content={"error": "Failed to connect to chat service"},
+                status_code=500
+            )
+
+# C# Chat Service URL
+CHAT_SERVICE_URL = os.environ.get("CHAT_SERVICE_URL", "http://localhost:5000")
+CHAT_SERVICE_WS_URL = os.environ.get("CHAT_SERVICE_WS_URL", "ws://localhost:5000")
+
+# Add WebSocket proxy route
+@app.get("/ws-proxy-info")
+async def get_ws_proxy_info():
+    """Return WebSocket proxy information"""
+    return JSONResponse({
+        "ws_url": CHAT_SERVICE_WS_URL,
+        "info": "Connect directly to the C# WebSocket service"
+    })
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -16,8 +16,8 @@
     },
     // UI settings
     ui: {
-      buttonText: '💬 Chat',
-      title: 'Chat with us',
+      buttonText: '💬',
+      title: 'Castlerock AI',
       placeholder: 'Type your message...',
       sendButtonText: 'Send',
       primaryColor: '#4a90e2',
@@ -29,36 +29,28 @@
     // Behavior
     behavior: {
       autoOpen: false,
-      rememberSession: true,
+      rememberSession: false,
       showTimestamp: true,
       debug: false,
     }
   };
 
+  // WebSocket URL
+  const WS_URL = 'ws://localhost:8765';
+
   // Main widget class
   class ChatbotWidget {
-    constructor(config = {}) {
-      try {
-        // Merge config with defaults
-        this.config = this.mergeConfig(defaultConfig, config);
-
-        // State
-        this.isOpen = false;
-        this.isLoading = false;
-        this.messages = [];
-
-        // Initialize
-        this.initialize();
-
-        // Add to window for debugging
-        if (this.config.behavior.debug) {
-          window.ChatbotWidget = this;
-        }
-
-        console.log(`[Chatbot] Widget initialized (v${VERSION})`);
-      } catch (error) {
-        console.error('[Chatbot] Initialization error:', error);
-      }
+    constructor(config) {
+      this.config = this.mergeConfig(defaultConfig, config || {});
+      this.socket = null;
+      this.connectionId = null;
+      this.messages = [];
+      this.isOpen = false;
+      this.isConnecting = false;
+      this.reconnectAttempts = 0;
+      this.maxReconnectAttempts = 5;
+      this.reconnectInterval = 3000;
+      this.initialize();
     }
 
     // Merge configurations
@@ -94,6 +86,9 @@
         if (this.config.behavior.autoOpen) {
           this.openChat();
         }
+
+        // Connect to WebSocket when initialized
+        this.connectWebSocket();
       } catch (error) {
         console.error('[Chatbot] Initialize error:', error);
       }
@@ -149,7 +144,7 @@
       Object.assign(this.container.style, {
         position: 'fixed',
         [this.config.ui.position.includes('right') ? 'right' : 'left']: '20px',
-        [this.config.ui.position.includes('top') ? 'top' : 'bottom']: '90px',
+        [this.config.ui.position.includes('top') ? 'top' : 'bottom']: '20px',
         width: '350px',
         maxWidth: '90vw',
         height: '500px',
@@ -215,8 +210,7 @@
       inputContainer.style.display = 'flex';
       inputContainer.style.gap = '10px';
 
-      this.input = document.createElement('input');
-      this.input.type = 'text';
+      this.input = document.createElement('textarea');
       this.input.placeholder = this.config.ui.placeholder;
       this.input.style.flex = '1';
       this.input.style.padding = '10px 15px';
@@ -224,6 +218,14 @@
       this.input.style.borderRadius = '20px';
       this.input.style.outline = 'none';
       this.input.style.fontSize = '14px';
+      this.input.style.resize = 'vertical';
+      this.input.style.overflow = 'auto';
+      this.input.style.minHeight = '40px';
+      this.input.style.maxHeight = '120px';
+      this.input.style.fontFamily = 'inherit';
+      this.input.style.lineHeight = '1.4';
+      this.input.rows = 1;
+      this.input.style.boxSizing = 'border-box';
 
       const sendButton = document.createElement('button');
       sendButton.textContent = this.config.ui.sendButtonText;
@@ -236,19 +238,34 @@
       sendButton.style.fontSize = '14px';
       sendButton.style.fontWeight = '500';
 
+      // Auto-resize textarea function
+      const resizeTextarea = () => {
+        this.input.style.height = 'auto';
+        this.input.style.height = this.input.scrollHeight + 'px';
+      };
+
       // Add event listeners for sending messages
       const sendMessage = () => {
         const message = this.input.value.trim();
         if (message) {
-          this.addMessage(message, true);
-          this.sendMessageToAPI(message);
+          this.sendMessage(message);
           this.input.value = '';
+          resizeTextarea();
         }
       };
 
       sendButton.addEventListener('click', sendMessage);
       this.input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      this.input.addEventListener('input', resizeTextarea);
+      this.input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
           sendMessage();
         }
       });
@@ -303,6 +320,11 @@
       this.button.style.display = 'none';
       this.input.focus();
 
+      // Ensure WebSocket is connected when chat is opened
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        this.connectWebSocket();
+      }
+
       // Save session state
       if (this.config.behavior.rememberSession) {
         this.saveSession();
@@ -317,20 +339,57 @@
     }
 
     // Add a message to the chat
-    addMessage(text, isUser = false) {
-      const message = {
-        text,
-        isUser,
-        timestamp: new Date().toISOString(),
-      };
+    addMessage(message) {
+      // Handle different message formats
+      let processedMessage;
 
-      this.messages.push(message);
-      this.renderMessage(message);
+      if (typeof message === 'string') {
+        // Simple string message (legacy support)
+        processedMessage = {
+          text: message,
+          isUser: false,
+          timestamp: new Date().toISOString(),
+        };
+      } else if (typeof message === 'object') {
+        if (message.type === 'user' || message.type === 'assistant' || message.type === 'system') {
+          // JSON message from WebSocket
+          processedMessage = {
+            text: message.content,
+            isUser: message.type === 'user',
+            timestamp: message.timestamp || new Date().toISOString(),
+            isSystem: message.type === 'system'
+          };
+        } else {
+          // Direct message object
+          processedMessage = {
+            text: message.text || message.content || '',
+            isUser: message.isUser || message.type === 'user',
+            timestamp: message.timestamp || new Date().toISOString(),
+            isSystem: message.isSystem || message.type === 'system'
+          };
+        }
+      } else {
+        console.error('[Chatbot] Invalid message format:', message);
+        return;
+      }
+
+      this.messages.push(processedMessage);
+      this.renderMessage(processedMessage);
 
       // Save session
       if (this.config.behavior.rememberSession) {
         this.saveSession();
       }
+    }
+
+    // Add a system message
+    addSystemMessage(text) {
+      const message = {
+        text,
+        isSystem: true,
+        timestamp: new Date().toISOString(),
+      };
+      this.addMessage(message);
     }
 
     // Render a message in the chat
@@ -341,7 +400,15 @@
       messageElement.style.borderRadius = '18px';
       messageElement.style.wordBreak = 'break-word';
 
-      if (message.isUser) {
+      if (message.isSystem) {
+        // System message styling
+        messageElement.style.alignSelf = 'center';
+        messageElement.style.backgroundColor = '#f8f9fa';
+        messageElement.style.color = '#666';
+        messageElement.style.fontSize = '0.9em';
+        messageElement.style.border = '1px solid #ddd';
+        messageElement.style.margin = '10px 0';
+      } else if (message.isUser) {
         messageElement.style.alignSelf = 'flex-end';
         messageElement.style.backgroundColor = this.config.ui.primaryColor;
         messageElement.style.color = 'white';
@@ -375,152 +442,109 @@
       }
     }
 
-    // Send message to API
-    async sendMessageToAPI(message) {
-      let controller;
-      let timeoutId;
-      const typingId = 'typing-' + Date.now();
+    // Connect to WebSocket
+    connectWebSocket() {
+      if (this.isConnecting) return;
+
+      this.isConnecting = true;
+
+      // Close existing socket if any
+      if (this.socket) {
+        this.socket.close();
+      }
+
+      const wsUrl = `${WS_URL}/${this.config.indexName || 'default'}`;
+      console.log(`Connecting to WebSocket: ${wsUrl}`);
 
       try {
-        this.isLoading = true;
+        this.socket = new WebSocket(wsUrl);
 
-        // Show typing indicator
-        this.messagesContainer.insertAdjacentHTML('beforeend', `
-          <div id="${typingId}" style="align-self: flex-start; margin: 5px 0;">
-            <div class="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </div>
-        `);
-
-        // Add typing indicator styles if not already present
-        if (!document.getElementById('chatbot-typing-styles')) {
-          const style = document.createElement('style');
-          style.id = 'chatbot-typing-styles';
-          style.textContent = `
-            @keyframes typing {
-              0% { transform: translateY(0); }
-              50% { transform: translateY(-5px); }
-              100% { transform: translateY(0); }
-            }
-            .typing-indicator {
-              display: flex;
-              gap: 5px;
-              padding: 10px 15px;
-              background: #f1f1f1;
-              border-radius: 18px;
-              border-bottom-left-radius: 4px;
-              width: fit-content;
-            }
-            .typing-indicator span {
-              width: 8px;
-              height: 8px;
-              background: #999;
-              border-radius: 50%;
-              display: inline-block;
-              animation: typing 1s infinite;
-            }
-            .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-            .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-          `;
-          document.head.appendChild(style);
-        }
-
-        // Make API call to the backend
-        controller = new AbortController();
-        timeoutId = setTimeout(() => controller.abort(), this.config.api.timeout);
-
-        // Get API URL
-        const apiUrl = this.config.api.baseUrl;
-        if (!apiUrl) {
-          throw new Error('API URL is not configured');
-        }
-
-        const requestBody = {
-          query: message
+        this.socket.onopen = () => {
+          console.log('WebSocket connected');
+          this.isConnecting = false;
+          this.reconnectAttempts = 0;
+          this.addSystemMessage('Connected to chat server');
         };
 
-        console.log('Sending request to:', apiUrl);
-        console.log('Request body:', requestBody);
+        this.socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('Received message:', data);
 
-        // Include origin and referer headers for domain authentication
-        const headers = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Origin': window.location.origin,
-          'Referer': window.location.href
-        };
+            // Store connection ID if provided
+            if (data.connection_id && !this.connectionId) {
+              this.connectionId = data.connection_id;
+            }
 
-        // Add authorization header if available
-        if (this.config.api.domainApiKey) {
-          headers['Authorization'] = `Bearer ${this.config.api.domainApiKey}`;
-        } else if (this.config.api.userToken) {
-          headers['Authorization'] = `Bearer ${this.config.api.userToken}`;
-        } else {
-          const storedToken = localStorage.getItem('auth_token') || localStorage.getItem('chatbot_auth_token');
-          if (storedToken) {
-            headers['Authorization'] = `Bearer ${storedToken}`;
+            // Add message to chat
+            this.addMessage(data);
+
+            // Handle escalation requests
+            if (data.escalation_requested) {
+              this.addSystemMessage('Your request for an agent has been received. Please wait while we connect you.');
+            }
+          } catch (err) {
+            console.error('Error parsing WebSocket message:', err);
+            // Try to display as plain text if JSON parsing fails
+            this.addSystemMessage('Received: ' + event.data);
           }
-        }
+        };
 
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
-          credentials: 'include',  // Include cookies if using session-based auth
-          mode: 'cors'  // Explicitly set CORS mode
-        });
+        this.socket.onclose = (event) => {
+          console.log(`WebSocket closed: ${event.code} ${event.reason}`);
+          this.isConnecting = false;
 
-        clearTimeout(timeoutId);
+          // Attempt to reconnect
+          if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            setTimeout(() => {
+              this.addSystemMessage(`Reconnecting (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+              this.connectWebSocket();
+            }, this.reconnectInterval);
+          } else {
+            this.addSystemMessage('Could not reconnect to the chat server. Please refresh the page.');
+          }
+        };
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
-        }
+        this.socket.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          this.isConnecting = false;
+        };
+      } catch (err) {
+        console.error('Error creating WebSocket:', err);
+        this.isConnecting = false;
+        this.addSystemMessage('Failed to connect to chat server. Please try again later.');
+      }
+    }
 
-        const data = await response.json();
+    // Send message via WebSocket
+    sendMessage(message) {
+      if (!message.trim()) return;
 
-        // Check for empty index response
-        if (data.error_type === 'empty_index' || data.empty_index === true) {
-          this.addMessage("This knowledge base is empty. Please add documents to the index before querying.", false);
-          return;
-        }
+      // Add user message to chat
+      const userMessage = {
+        type: 'user',
+        content: message,
+        timestamp: new Date().toISOString()
+      };
+      this.addMessage(userMessage);
 
-        // Add response to chat
-        if (data && data.response) {
-          this.addMessage(data.response, false);
-        } else if (data && data.answer) {
-          this.addMessage(data.answer, false);
-        } else {
-          throw new Error('Invalid response format from server');
-        }
+      // Send message via WebSocket if connected
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify(userMessage));
+      } else {
+        // Try to reconnect
+        this.addSystemMessage('Not connected to chat server. Attempting to reconnect...');
+        this.connectWebSocket();
 
-      } catch (error) {
-        console.error('[Chatbot] Error sending message:', error);
-
-        let errorMessage = 'An error occurred. Please try again.';
-        if (error.name === 'AbortError') {
-          errorMessage = 'The request timed out. Please try again.';
-        } else if (error.message.includes('401')) {
-          errorMessage = 'Authentication failed. Please refresh the page and try again.';
-        } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-          errorMessage = 'Unable to connect to the server. Please check your connection.';
-        } else if (error.message.includes('CORS')) {
-          errorMessage = 'Cross-origin request blocked. Please contact the site administrator.';
-        } else if (error.message.includes('list') && error.message.includes('attribute')) {
-          errorMessage = 'This knowledge base is empty. Please add documents to the index before querying.';
-        }
-
-        this.addMessage(errorMessage, false);
-
-      } finally {
-        // Always remove typing indicator and clean up
-        this.removeTypingIndicator(typingId);
-        if (timeoutId) clearTimeout(timeoutId);
-        this.isLoading = false;
+        // Queue the message to be sent after connection
+        setTimeout(() => {
+          if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify(userMessage));
+          } else {
+            this.addSystemMessage('Still not connected. Please try again later.');
+          }
+        }, 2000);
       }
     }
 
@@ -546,6 +570,7 @@
           messages: this.messages,
           isOpen: this.isOpen,
           timestamp: new Date().toISOString(),
+          connectionId: this.connectionId
         };
 
         localStorage.setItem('chatbot_session', JSON.stringify(sessionData));
@@ -566,7 +591,12 @@
         // Load session data
         const sessionData = localStorage.getItem('chatbot_session');
         if (sessionData) {
-          const { messages, isOpen } = JSON.parse(sessionData);
+          const { messages, isOpen, connectionId } = JSON.parse(sessionData);
+
+          // Restore connection ID if available
+          if (connectionId) {
+            this.connectionId = connectionId;
+          }
 
           // Only restore if messages exist
           if (messages && messages.length > 0) {
@@ -593,12 +623,6 @@
   // Auto-initialize if script is included directly
   if (!window.ChatbotWidget) {
     const config = window.chatbotConfig || {};
-
-    // Ensure API URL is set to localhost:3000
-    config.api = config.api || {};
-    if (!config.api.baseUrl) {
-      config.api.baseUrl = 'http://localhost:3000/api/chat';
-    }
 
     // Initialize the widget
     window.ChatbotWidget = new ChatbotWidget(config);

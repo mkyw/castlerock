@@ -833,12 +833,14 @@ class KBScraper:
             logger.error(f"Error processing PDF: {str(e)}")
             return {"status": "error", "message": f"Failed to process PDF: {str(e)}"}
     
-    async def query(self, query: str, k: int = 5) -> Dict[str, Any]:
+    async def query(self, query: str, k: int = 5, conversation_history: Optional[List[Dict[str, str]]] = None, context_documents: Optional[List[str]] = None) -> Dict[str, Any]:
         """Query the knowledge base using OpenAI first, then fall back to Gemini if needed
         
         Args:
             query: The query string
             k: Number of results to return
+            conversation_history: Optional list of previous messages in the conversation
+            context_documents: Optional list of context documents to include
             
         Returns:
             Dict with status, answer, and optional error fields
@@ -857,6 +859,21 @@ class KBScraper:
             context = "\n\n".join([r["text"] for r in results])
             sources = list(set([r["source"] for r in results if "source" in r]))
             
+            # Add any additional context documents if provided
+            if context_documents and len(context_documents) > 0:
+                additional_context = "\n\n".join(context_documents)
+                context = f"{context}\n\n{additional_context}"
+            
+            # Format conversation history if provided
+            conversation_context = ""
+            if conversation_history and len(conversation_history) > 0:
+                conversation_context = "Previous conversation:\n"
+                for msg in conversation_history:
+                    role = msg.get("role", "unknown")
+                    content = msg.get("content", "")
+                    conversation_context += f"{role.capitalize()}: {content}\n"
+                conversation_context += "\n"
+            
             # First try OpenAI as the primary option
             print("Trying OpenAI as primary option...")
             openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -870,6 +887,8 @@ class KBScraper:
             
                         Context:
                         {context}
+                        
+                        {conversation_context}
                         
                         Question: {query}
                         

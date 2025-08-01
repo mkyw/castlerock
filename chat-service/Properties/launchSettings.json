@@ -1,0 +1,14 @@
+{
+    "profiles": {
+        "ChatService": {
+            "commandName": "Project",
+            "dotnetRunMessages": true,
+            "launchBrowser": false,
+            "applicationUrl": "http://localhost:5000",
+            "environmentVariables": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "JWT_SECRET": "castlerock_default_secret_key_for_development"
+            }
+        }
+    }
+}
