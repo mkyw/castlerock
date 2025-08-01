@@ -2,7 +2,9 @@ import os
 import subprocess
 from openai import OpenAI
 
-client = OpenAI(api_key="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")
+with open("apikey.txt", "r") as f:
+    apikey = f.read().strip()
+client = OpenAI(api_key=apikey)
 
 SCRIPT_FILE = "utilities/emulator_script.py"
 OUTPUT_DIR = "emulator_screenshots"
