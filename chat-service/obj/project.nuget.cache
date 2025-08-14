@@ -1,10 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "A00T4MxuZG4=",
+  "dgSpecHash": "hqBP0zRrLzI=",
   "success": true,
   "projectFilePath": "/Users/michaelwong/vscode/Projects/castlerock/chat-service/ChatService.csproj",
   "expectedPackageFiles": [
     "/Users/michaelwong/.nuget/packages/microsoft.aspnetcore.authentication.jwtbearer/9.0.0-preview.5.24306.11/microsoft.aspnetcore.authentication.jwtbearer.9.0.0-preview.5.24306.11.nupkg.sha512",
+    "/Users/michaelwong/.nuget/packages/microsoft.codeanalysis.netanalyzers/9.0.0/microsoft.codeanalysis.netanalyzers.9.0.0.nupkg.sha512",
     "/Users/michaelwong/.nuget/packages/microsoft.identitymodel.abstractions/7.4.1/microsoft.identitymodel.abstractions.7.4.1.nupkg.sha512",
     "/Users/michaelwong/.nuget/packages/microsoft.identitymodel.jsonwebtokens/7.4.1/microsoft.identitymodel.jsonwebtokens.7.4.1.nupkg.sha512",
     "/Users/michaelwong/.nuget/packages/microsoft.identitymodel.logging/7.4.1/microsoft.identitymodel.logging.7.4.1.nupkg.sha512",

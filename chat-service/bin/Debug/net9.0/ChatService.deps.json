@@ -9,6 +9,7 @@
       "ChatService/1.0.0": {
         "dependencies": {
           "Microsoft.AspNetCore.Authentication.JwtBearer": "9.0.0-preview.5.24306.11",
+          "Microsoft.CodeAnalysis.NetAnalyzers": "9.0.0",
           "Newtonsoft.Json": "13.0.3",
           "System.IdentityModel.Tokens.Jwt": "7.4.1"
         },
@@ -27,6 +28,7 @@
           }
         }
       },
+      "Microsoft.CodeAnalysis.NetAnalyzers/9.0.0": {},
       "Microsoft.IdentityModel.Abstractions/7.4.1": {
         "runtime": {
           "lib/net8.0/Microsoft.IdentityModel.Abstractions.dll": {
@@ -125,6 +127,13 @@
       "sha512": "sha512-KEUH+2fMqxOg+Xf+O0ByaKY+vnvsVNWQo4Hrki9Iit8rXhVF7axK/Ui4DVW/8LkPExmxmh6wqDPsDnBO4FDWSg==",
       "path": "microsoft.aspnetcore.authentication.jwtbearer/9.0.0-preview.5.24306.11",
       "hashPath": "microsoft.aspnetcore.authentication.jwtbearer.9.0.0-preview.5.24306.11.nupkg.sha512"
+    },
+    "Microsoft.CodeAnalysis.NetAnalyzers/9.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-JajbvkrBgtdRghavIjcJuNHMOja4lqBmEezbhZyqWPYh2cpLhT5mPpfC7NQVDO4IehWQum9t/nwF4v+qQGtYWg==",
+      "path": "microsoft.codeanalysis.netanalyzers/9.0.0",
+      "hashPath": "microsoft.codeanalysis.netanalyzers.9.0.0.nupkg.sha512"
     },
     "Microsoft.IdentityModel.Abstractions/7.4.1": {
       "type": "package",

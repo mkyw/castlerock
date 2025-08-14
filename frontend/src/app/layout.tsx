@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/app/providers";
 import SessionProviderWrapper from "@/components/providers/SessionProviderWrapper";
+import ChatbotWidgetAuthProvider from "@/components/ChatbotWidgetAuthProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,6 +36,7 @@ export default function RootLayout({
         <SessionProviderWrapper>
           <Providers>
             {children}
+            <ChatbotWidgetAuthProvider />
           </Providers>
         </SessionProviderWrapper>
       </body>

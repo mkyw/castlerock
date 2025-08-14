@@ -110,7 +110,7 @@ def get_all_whitelisted_domains():
             "http://localhost:3000",
             "http://localhost:3001",
             "http://localhost:8000",
-            "http://localhost:5000",
+            "http://localhost:5001",
             "https://localhost",
             "https://localhost:3000"
         ]
@@ -127,7 +127,7 @@ def get_all_whitelisted_domains():
             "http://localhost:3000",
             "http://localhost:3001",
             "http://localhost:8000",
-            "http://localhost:5000",
+            "http://localhost:5001",
             "https://localhost",
             "https://localhost:3000"
         ]
@@ -941,6 +941,9 @@ async def query_rag(
     """
     logger.info(f"RAG query request: {query_data.dict()}")
     
+    # Check for internal service request
+    is_internal_service = request.headers.get('X-Internal-Service') == 'chat-service'
+    
     # Check for domain authentication first
     domain_user_id = getattr(request.state, 'domain_authenticated_user_id', None)
     domain_index_name = getattr(request.state, 'domain_index_name', None)
@@ -1161,8 +1164,8 @@ async def proxy_end_chat(
             )
 
 # C# Chat Service URL
-CHAT_SERVICE_URL = os.environ.get("CHAT_SERVICE_URL", "http://localhost:5000")
-CHAT_SERVICE_WS_URL = os.environ.get("CHAT_SERVICE_WS_URL", "ws://localhost:5000")
+CHAT_SERVICE_URL = os.environ.get("CHAT_SERVICE_URL", "http://localhost:5001")
+CHAT_SERVICE_WS_URL = os.environ.get("CHAT_SERVICE_WS_URL", "ws://localhost:5001")
 
 # Add WebSocket proxy route
 @app.get("/ws-proxy-info")

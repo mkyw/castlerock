@@ -82,7 +82,8 @@ export default function IndexList() {
 
       if (data) {
         // Use the returned index name for navigation
-        router.push(`/dashboard/${encodeURIComponent(data.name)}`);
+        // Use the formatted (short) index name for the dashboard URL
+        router.push(`/dashboard/${encodeURIComponent(formatIndexName(data.name))}`);
       }
     } catch (error) {
       console.error('Error creating index:', error);
@@ -203,7 +204,8 @@ export default function IndexList() {
               >
                 <ListItemButton
                   onClick={() => {
-                    router.push(`/dashboard/${encodeURIComponent(index.name)}`);
+                    // Use the formatted (short) index name for the dashboard URL
+                    router.push(`/dashboard/${encodeURIComponent(formatIndexName(index.name))}`);
                   }}
                 >
                   <ListItemText

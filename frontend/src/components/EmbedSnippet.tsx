@@ -77,13 +77,6 @@ export default function EmbedSnippet({ indexName }: EmbedSnippetProps) {
 
   return (
     <Box sx={{ mt: 4, maxWidth: '800px' }}>
-      <Typography variant="h6" gutterBottom>
-        Add Chatbot to Your Website
-      </Typography>
-      <Typography variant="body1" paragraph>
-        Copy and paste this code into your website's HTML to add the chatbot widget.
-        The widget will automatically connect to your "{indexName}" knowledge base.
-      </Typography>
 
       <Paper
         variant="outlined"
@@ -156,17 +149,6 @@ export default function EmbedSnippet({ indexName }: EmbedSnippetProps) {
           )}
         </Box>
       </Paper>
-
-      <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
-        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-          Quick Tips:
-        </Typography>
-        <ul style={{ margin: '0 0 0 20px', padding: 0, color: 'text.secondary' }}>
-          <li>Place this code before the <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: 4 }}>&lt;/body&gt;</code> tag</li>
-          <li>Customize the button text, color, and position by modifying the config object</li>
-          <li>The widget will automatically connect to your knowledge base</li>
-        </ul>
-      </Box>
     </Box>
   );
 }

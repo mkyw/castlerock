@@ -27,7 +27,7 @@ class DomainAuthMiddleware(BaseHTTPMiddleware):
     
     async def dispatch(self, request: Request, call_next):
         # Skip validation for certain paths
-        if self.should_skip_validation(request.url.path):
+        if self.should_skip_validation(request):
             return await call_next(request)
         
         # Get domain from referer or origin header
@@ -88,8 +88,9 @@ class DomainAuthMiddleware(BaseHTTPMiddleware):
                 
         return False
 
-    def should_skip_validation(self, path):
+    def should_skip_validation(self, request):
         # Skip validation for OPTIONS requests (preflight) and public endpoints
+        path = request.url.path
         if path in ['/auth/login', '/auth/refresh-token', '/debug/auth/token']:
             return True
         

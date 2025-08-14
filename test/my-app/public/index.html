@@ -1,21 +1,495 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 
 <head>
-  <title>Demo Site</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Information Technology - University of Wisconsin–Madison - UW–Madison Information Technology</title>
+  <meta name="description"
+    content="Connecting and supporting our digital campus with info on IT services, tools, news, departments, events and more across the university.">
+
+  <!-- Fonts -->
+  <link rel="preload"
+    href="https://it.wisc.edu/wp-content/themes/uw-theme/dist/fonts/uw-rh/redhat-display-latin.v14.woff2" as="font"
+    type="font/woff2" crossorigin="">
+  <link rel="preload" href="https://it.wisc.edu/wp-content/themes/uw-theme/dist/fonts/uw-rh/redhat-text-latin.v13.woff2"
+    as="font" type="font/woff2" crossorigin="">
+
+  <style>
+    :root {
+      --uwTextFont: 'Red Hat Text', sans-serif;
+      --uwDisplayFont: 'Red Hat Display', sans-serif;
+      --uwRed: #c5050c;
+      --uwDarkRed: #9b0000;
+      --uwLightGray: #f7f7f7;
+      --uwMediumGray: #e2e5e6;
+      --uwDarkGray: #494949;
+      --uwBlue: #0479a8;
+    }
+
+    body {
+      font-family: var(--uwTextFont);
+      margin: 0;
+      padding: 0;
+      background-color: var(--uwLightGray);
+    }
+
+    .uw-global-bar {
+      background-color: #282728;
+      color: white;
+      padding: 0.5rem 1rem;
+    }
+
+    .uw-global-name-link {
+      color: white;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .uw-header {
+      background-color: white;
+      padding: 1rem;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .uw-header-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .uw-header-crest-title {
+      display: flex;
+      align-items: center;
+    }
+
+    .uw-header-crest svg {
+      height: 50px;
+      width: auto;
+      margin-right: 1rem;
+    }
+
+    .uw-site-title {
+      margin: 0;
+      font-family: var(--uwDisplayFont);
+      font-size: 1.5rem;
+    }
+
+    .uw-site-title a {
+      color: var(--uwRed);
+      text-decoration: none;
+    }
+
+    .uw-site-tagline {
+      font-size: 0.9rem;
+      color: var(--uwDarkGray);
+    }
+
+    .uw-header-search {
+      display: flex;
+    }
+
+    .uw-search-form {
+      display: flex;
+    }
+
+    .uw-search-input {
+      padding: 0.5rem;
+      border: 1px solid var(--uwMediumGray);
+      border-radius: 2px 0 0 2px;
+    }
+
+    .uw-search-submit {
+      background-color: var(--uwRed);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0 2px 2px 0;
+      cursor: pointer;
+    }
+
+    .uw-top-menus {
+      background-color: white;
+      border-bottom: 1px solid var(--uwMediumGray);
+    }
+
+    .uw-main-nav {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .uw-nav-menu ul {
+      list-style: none;
+      display: flex;
+      padding: 0;
+      margin: 0;
+    }
+
+    .uw-nav-menu li {
+      margin: 0;
+      padding: 0;
+    }
+
+    .uw-nav-menu a {
+      display: block;
+      padding: 1rem;
+      color: var(--uwDarkGray);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .uw-nav-menu a:hover {
+      color: var(--uwRed);
+    }
+
+    .uw-hero {
+      background-color: var(--uwRed);
+      color: white;
+      padding: 3rem 1rem;
+      text-align: center;
+    }
+
+    .uw-hero h2 {
+      font-family: var(--uwDisplayFont);
+      font-size: 2.5rem;
+      margin: 0 0 1rem 0;
+    }
+
+    .uw-content {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    .uw-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+    }
+
+    .uw-card {
+      background-color: white;
+      border-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      padding: 1.5rem;
+    }
+
+    .uw-card h3 {
+      color: var(--uwRed);
+      margin-top: 0;
+      font-family: var(--uwDisplayFont);
+    }
+
+    .uw-button {
+      display: inline-block;
+      background-color: var(--uwRed);
+      color: white;
+      padding: 0.75rem 1rem;
+      text-decoration: none;
+      border-radius: 2px;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.925rem;
+    }
+
+    .uw-button:hover {
+      background-color: var(--uwDarkRed);
+    }
+
+    .uw-footer {
+      background-color: #282728;
+      color: white;
+      padding: 3rem 1rem;
+    }
+
+    .uw-footer-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2rem;
+    }
+
+    .uw-footer h4 {
+      color: white;
+      font-family: var(--uwDisplayFont);
+      margin-top: 0;
+    }
+
+    .uw-footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .uw-footer a {
+      color: #ccc;
+      text-decoration: none;
+      display: block;
+      padding: 0.5rem 0;
+    }
+
+    .uw-footer a:hover {
+      color: white;
+    }
+
+    .uw-copyright {
+      text-align: center;
+      padding-top: 2rem;
+      color: #ccc;
+      font-size: 0.9rem;
+    }
+
+    .uw-mobile-menu-button-bar {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .uw-header-container {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .uw-header-search {
+        width: 100%;
+        margin-top: 1rem;
+      }
+
+      .uw-search-form {
+        width: 100%;
+      }
+
+      .uw-search-input {
+        flex-grow: 1;
+      }
+
+      .uw-mobile-menu-button-bar {
+        display: block;
+        width: 100%;
+        background-color: var(--uwRed);
+        color: white;
+        border: none;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .uw-nav-menu ul {
+        flex-direction: column;
+      }
+
+      .uw-top-menus {
+        display: none;
+      }
+
+      .uw-top-menus.uw-is-visible {
+        display: block;
+      }
+    }
+  </style>
 </head>
 
 <body>
-  <div id="root">
+  <a class="show-on-focus" href="#main" id="skip-link">Skip to main content</a>
+
+  <div class="uw-global-bar" role="navigation">
+    <a class="uw-global-name-link" href="https://www.wisc.edu"
+      aria-label="University of Wisconsin Madison home page">University of Wisconsin–Madison</a>
   </div>
+
+  <header class="uw-header">
+    <div class="uw-header-container">
+      <div class="uw-header-crest-title">
+        <div class="uw-header-crest">
+          <a href="https://it.wisc.edu/">
+            <svg viewBox="0 0 55.5 87.28" version="1.1" role="img">
+              <title>UW Crest</title>
+              <path fill="#c5050c"
+                d="M28,87.36a3.78,3.78,0,0,1-1.05-1.16l-0.06-.09-0.11,0C8.65,81.86-1.45,54,.83,31.71a47.71,47.71,0,0,1,1.29-7.25,35.39,35.39,0,0,1,2.33-6.39,23.55,23.55,0,0,1,3.75-5.65A14.7,14.7,0,0,1,19,7.28,0.33,0.33,0,0,0,19.33,7,5.49,5.49,0,0,1,23.21,4.4l0.19,0,0-.19A4.69,4.69,0,0,1,28,.64a4.76,4.76,0,0,1,4.56,3.54l0,0.19,0.19,0A5.51,5.51,0,0,1,36.67,7a0.32,0.32,0,0,0,.37.26,14.7,14.7,0,0,1,10.77,5.13,24,24,0,0,1,4.24,6.71l0.23,0.55a42.56,42.56,0,0,1,2.89,12C57.45,54,47.35,81.86,29.23,86.08l-0.11,0-0.06.09A3.78,3.78,0,0,1,28,87.36Z">
+              </path>
+            </svg>
+          </a>
+        </div>
+        <div class="uw-title-tagline">
+          <h1 id="site-title" class="uw-site-title">
+            <a href="https://it.wisc.edu/" rel="home">UW–Madison Information Technology</a>
+          </h1>
+          <div id="site-description" class="uw-site-tagline">Connecting &amp; supporting our digital campus</div>
+        </div>
+      </div>
+      <div class="uw-header-search">
+        <form role="search" class="uw-search-form" method="get" id="searchform"
+          action="https://it.wisc.edu/search-results/">
+          <label for="q" class="show-for-sr">Search</label>
+          <input type="text" class="field uw-search-input" name="q" id="q" placeholder="Search">
+          <input type="submit" class="submit uw-search-submit" name="submit" id="searchsubmit" value="Search">
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <button class="uw-mobile-menu-button-bar" aria-label="Open menu" aria-expanded="false" aria-controls="uw-top-menus">
+    <span>Menu</span>
+  </button>
+
+  <div id="uw-top-menus" class="uw-stacked" aria-hidden="true">
+    <div class="uw-main-nav">
+      <nav class="uw-nav-menu" aria-label="Main Menu">
+        <ul id="uw-main-nav">
+          <li class="menu-item"><a href="https://it.wisc.edu/services/">Services</a></li>
+          <li class="menu-item"><a href="https://it.wisc.edu/learn/">Learn</a></li>
+          <li class="menu-item"><a href="https://it.wisc.edu/it-community/">Community &amp; governance</a></li>
+          <li class="menu-item"><a href="https://it.wisc.edu/it-projects-priorities-stub/">IT projects &amp;
+              priorities</a></li>
+          <li class="menu-item"><a
+              href="https://it.wisc.edu/about/division-of-information-technology/enterprise-information-security-services/office-of-cybersecurity/">Cybersecurity</a>
+          </li>
+          <li class="menu-item"><a href="https://it.wisc.edu/academic-technology/">Academic Technology</a></li>
+          <li class="menu-item"><a href="https://it.wisc.edu/digital-accessibility/">Accessibility</a></li>
+          <li class="menu-item"><a
+              href="https://it.wisc.edu/generative-ai-services-uw-madison/generative-ai-uw-madison-use-policies/">AI</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+
+  <div class="uw-hero">
+    <h2>Information Technology at UW–Madison</h2>
+    <p>Connecting and supporting our digital campus with info on IT services, tools, news, departments, events and more
+      across the university.</p>
+  </div>
+
+  <main id="main" class="uw-content">
+    <div class="uw-grid">
+      <div class="uw-card">
+        <h3>Services</h3>
+        <p>Find IT services and tools available to the UW–Madison community.</p>
+        <a href="https://it.wisc.edu/services/" class="uw-button">Explore Services</a>
+      </div>
+
+      <div class="uw-card">
+        <h3>Learn</h3>
+        <p>Access training, documentation, and resources to help you use campus technology.</p>
+        <a href="https://it.wisc.edu/learn/" class="uw-button">Start Learning</a>
+      </div>
+
+      <div class="uw-card">
+        <h3>Community &amp; Governance</h3>
+        <p>Connect with IT professionals and learn about IT governance at UW–Madison.</p>
+        <a href="https://it.wisc.edu/it-community/" class="uw-button">Get Involved</a>
+      </div>
+
+      <div class="uw-card">
+        <h3>Cybersecurity</h3>
+        <p>Learn about cybersecurity resources, policies, and best practices.</p>
+        <a href="https://it.wisc.edu/about/division-of-information-technology/enterprise-information-security-services/office-of-cybersecurity/"
+          class="uw-button">Stay Secure</a>
+      </div>
+
+      <div class="uw-card">
+        <h3>Academic Technology</h3>
+        <p>Discover tools and resources for teaching, learning, and research.</p>
+        <a href="https://it.wisc.edu/academic-technology/" class="uw-button">Learn More</a>
+      </div>
+
+      <div class="uw-card">
+        <h3>Digital Accessibility</h3>
+        <p>Find resources to make your digital content accessible to everyone.</p>
+        <a href="https://it.wisc.edu/digital-accessibility/" class="uw-button">Make It Accessible</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="uw-footer">
+    <div class="uw-footer-container">
+      <div class="uw-footer-column">
+        <h4>Services</h4>
+        <ul>
+          <li><a href="#">Email &amp; Calendar</a></li>
+          <li><a href="#">Software</a></li>
+          <li><a href="#">Network &amp; Internet</a></li>
+          <li><a href="#">Security</a></li>
+        </ul>
+      </div>
+
+      <div class="uw-footer-column">
+        <h4>Support</h4>
+        <ul>
+          <li><a href="#">Help Desk</a></li>
+          <li><a href="#">Knowledge Base</a></li>
+          <li><a href="#">Training</a></li>
+          <li><a href="#">Documentation</a></li>
+        </ul>
+      </div>
+
+      <div class="uw-footer-column">
+        <h4>About</h4>
+        <ul>
+          <li><a href="#">Division of IT</a></li>
+          <li><a href="#">Staff Directory</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Contact Us</a></li>
+        </ul>
+      </div>
+
+      <div class="uw-footer-column">
+        <h4>Connect</h4>
+        <ul>
+          <li><a href="#">Twitter</a></li>
+          <li><a href="#">LinkedIn</a></li>
+          <li><a href="#">YouTube</a></li>
+          <li><a href="#">Newsletter</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="uw-copyright">
+      <p>&copy; 2025 Board of Regents of the University of Wisconsin System</p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('.uw-mobile-menu-button-bar').addEventListener('click', function () {
+      const topMenus = document.getElementById('uw-top-menus');
+      const isHidden = topMenus.getAttribute('aria-hidden') === 'true';
+
+      topMenus.setAttribute('aria-hidden', !isHidden);
+      topMenus.classList.toggle('uw-is-visible');
+
+      this.setAttribute('aria-expanded', !isHidden);
+    });
+  </script>
+
   <!-- Add this code before the closing </body> tag -->
   <script>
-    // Load the widget script
+    // Load the chatbot widget script
     (function () {
       const script = document.createElement('script');
       script.src = "http://localhost:3000/widget/chatbot-widget-new.js";
       script.async = true;
-      document.body.appendChild(script);
+
+      // Add custom configuration
+      window.chatbotConfig = {
+        "ui": {
+          "title": "doit",
+          "primaryColor": "var(--uwRed)" // Use UW-Madison red color variable
+        },
+        "indexName": "doit" // Explicitly connect to the DoIT index
+      };
+
+      // Create a container for the chatbot with specific styling
+      const chatbotContainer = document.createElement('div');
+      chatbotContainer.id = 'chatbot-container';
+      chatbotContainer.style.setProperty('--chatbot-primary-color', 'var(--uwRed)');
+      document.body.appendChild(chatbotContainer);
+
+      // Append the script to the container instead of directly to body
+      chatbotContainer.appendChild(script);
     })();
   </script>
 </body>

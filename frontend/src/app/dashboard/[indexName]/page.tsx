@@ -2,9 +2,10 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { formatIndexName } from '@/lib/api-utils';
+import { getChatServiceUrl } from '@/lib/api-config';
 import {
   Box,
   Typography,
@@ -107,6 +108,20 @@ function KnowledgeBasePage() {
   const decodedIndexName = useMemo(() => {
     if (!isClient || !indexName) return '';
     try {
+      // Check if indexName is 'localhost' or contains 'localhost'
+      if (indexName === 'localhost' || indexName.includes('localhost')) {
+        console.warn('Index name contains localhost:', indexName);
+        // If we're on localhost and the index name is also localhost, this is likely wrong
+        // Try to extract the actual index name from the URL path
+        if (typeof window !== 'undefined') {
+          const pathParts = window.location.pathname.split('/');
+          // Dashboard URL format is /dashboard/[indexName]
+          if (pathParts.length >= 3 && pathParts[1] === 'dashboard') {
+            console.log('Extracted index name from URL path:', pathParts[2]);
+            return pathParts[2]; // This should be the actual index name
+          }
+        }
+      }
       return decodeURIComponent(indexName);
     } catch (error) {
       console.error('Error decoding index name:', error);
@@ -121,87 +136,162 @@ function KnowledgeBasePage() {
     }
   }, [decodedIndexName]);
 
+  // Use refs to store previous data and compare without triggering re-renders
+  const prevChatsRef = useRef({});
+  const prevStatsRef = useRef({ total: 0, ai_handling: 0, escalation_requested: 0, agent_assigned: 0 });
+  const scrollPosRef = useRef(0);
+
+  // Track if we're in the middle of a data fetch to avoid multiple concurrent fetches
+  const isFetchingRef = useRef(false);
+
+  // Track scroll position without state updates
+  useEffect(() => {
+    const handleScroll = () => {
+      scrollPosRef.current = window.scrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Function to compare objects deeply
+  const isEqual = (obj1: any, obj2: any) => {
+    return JSON.stringify(obj1) === JSON.stringify(obj2);
+  };
+
   // Fetch chat statistics and active chats
   useEffect(() => {
     if (status === 'authenticated' && session?.accessToken && activeTab === 0) {
       const fetchChatData = async () => {
-        setLoading(true);
+        // Prevent concurrent fetches
+        if (isFetchingRef.current) return;
+        isFetchingRef.current = true;
+
+        // Remember scroll position before fetch
+        const currentScrollPos = scrollPosRef.current;
+
+        // Only set loading on initial fetch
+        if (Object.keys(activeChats).length === 0) {
+          setLoading(true);
+        }
+
         try {
-          // Try to fetch chat statistics from our enhanced WebSocket server
+          let shouldUpdateUI = false;
+          let newStats = { ...prevStatsRef.current };
+
+          // Define proper types for the chat data structure
+          interface ChatData {
+            status: string;
+            connected_at: string;
+            last_activity: string;
+            escalation_requested_at: string | null;
+            message_count: number;
+            user_agent: string;
+            agent_id: string | null;
+            connectionId: string;
+            indexName: string;
+          }
+
+          // Define the structure of newChats with proper indexing
+          let newChats: Record<string, Record<string, ChatData>> = {};
+
+          // Try to fetch chat statistics
           try {
-            const statsResponse = await fetch('http://localhost:8766/api/chat/stats');
+            const statsResponse = await fetch(`${getChatServiceUrl()}/api/chat/stats`);
 
             if (statsResponse.ok) {
               const statsData = await statsResponse.json();
-              setChatStats({
+              newStats = {
                 total: statsData.total_active || 0,
                 ai_handling: statsData.total_active - (statsData.escalation_requested || 0),
                 escalation_requested: statsData.escalation_requested || 0,
                 agent_assigned: statsData.agent_assigned || 0
-              });
-            } else {
-              console.warn('Chat statistics API not available yet');
-              // Set default stats instead of failing
-              setChatStats({ total: 0, ai_handling: 0, escalation_requested: 0, agent_assigned: 0 });
+              };
+
+              // Check if stats have changed
+              if (!isEqual(newStats, prevStatsRef.current)) {
+                shouldUpdateUI = true;
+              }
             }
           } catch (statsErr) {
             console.warn('Error fetching chat statistics:', statsErr);
-            // Set default stats instead of failing
-            setChatStats({ total: 0, ai_handling: 0, escalation_requested: 0, agent_assigned: 0 });
           }
 
-          // Try to fetch active chats from our enhanced WebSocket server
+          // Try to fetch active chats
           try {
-            const chatsResponse = await fetch('http://localhost:8766/api/chat/active');
+            const chatsResponse = await fetch(`${getChatServiceUrl()}/api/chat/active`);
 
             if (chatsResponse.ok) {
               const chatsData = await chatsResponse.json();
+              newChats = {};
 
-              // Convert the flat structure to the nested structure expected by the UI
-              const formattedChats: Record<string, Record<string, any>> = {};
-
+              // Process chat data
               chatsData.connections.forEach((chat: any) => {
                 const indexName = chat.index_name;
                 const connectionId = chat.connection_id;
 
-                if (!formattedChats[indexName]) {
-                  formattedChats[indexName] = {};
+                if (!newChats[indexName]) {
+                  newChats[indexName] = {};
                 }
 
-                formattedChats[indexName][connectionId] = {
+                // Filter out system messages and duplicate AI messages from the count
+                // If the server doesn't provide filtered_message_count, fall back to message_count
+                const filteredMessageCount = chat.filtered_message_count !== undefined ?
+                  chat.filtered_message_count :
+                  chat.message_count;
+
+                newChats[indexName][connectionId] = {
                   status: chat.status,
                   connected_at: chat.connected_at,
                   last_activity: chat.last_activity,
-                  message_count: chat.message_count,
-                  user_agent: chat.user_agent
+                  escalation_requested_at: chat.escalation_requested_at,
+                  message_count: filteredMessageCount, // Use the filtered count
+                  user_agent: chat.user_agent,
+                  agent_id: chat.agent_id,
+                  // Add the required properties from our ChatData interface
+                  connectionId: chat.connection_id,
+                  indexName: chat.index_name
                 };
               });
 
-              setActiveChats(formattedChats);
-            } else {
-              console.warn('Active chats API not available yet');
-              // Set empty chats instead of failing
-              setActiveChats({});
+              // Check if chats have changed
+              if (!isEqual(newChats, prevChatsRef.current)) {
+                shouldUpdateUI = true;
+              }
             }
           } catch (chatsErr) {
             console.warn('Error fetching active chats:', chatsErr);
-            // Set empty chats instead of failing
-            setActiveChats({});
           }
 
-          // Clear any previous errors since we're handling them gracefully now
-          setError(null);
+          // Only update UI if data has changed
+          if (shouldUpdateUI) {
+            // Update refs first
+            prevStatsRef.current = newStats;
+            prevChatsRef.current = newChats;
+
+            // Then update state (which triggers re-render)
+            setChatStats(newStats);
+            setActiveChats(newChats);
+            setError(null);
+
+            // Restore scroll position after a small delay to ensure DOM has updated
+            setTimeout(() => {
+              window.scrollTo(0, currentScrollPos);
+            }, 50);
+          }
         } catch (err) {
           console.error('Unexpected error in fetchChatData:', err);
           setError('Some chat data may not be available. The WebSocket server might be starting up.');
         } finally {
           setLoading(false);
+          isFetchingRef.current = false;
         }
       };
 
+      // Initial fetch
       fetchChatData();
 
-      // Set up polling for updates
+      // Set up polling with a ref-based approach to avoid closure issues
       const interval = setInterval(fetchChatData, 5000); // Update every 5 seconds
 
       return () => clearInterval(interval);
@@ -261,7 +351,8 @@ function KnowledgeBasePage() {
     Object.keys(activeChats).forEach(indexName => {
       Object.keys(activeChats[indexName]).forEach(connectionId => {
         const chat = activeChats[indexName][connectionId];
-        if (chat.status === status) {
+        // Only include chats with the requested status AND at least one user message
+        if (chat.status === status && (chat.message_count || 0) > 0) {
           result.push({
             ...chat,
             indexName,
@@ -365,9 +456,6 @@ function KnowledgeBasePage() {
 
         <TabPanel value={activeTab} index={0}>
           <Paper className="p-4 h-full">
-            <Typography variant="h6" gutterBottom>
-              Live Chat Sessions
-            </Typography>
 
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -385,12 +473,12 @@ function KnowledgeBasePage() {
               <Alert severity="info" sx={{ mb: 2 }}>
                 No active chat sessions found. This could be because:
                 <ul>
-                  <li>There are no active chats at the moment</li>
-                  <li>The backend WebSocket service is still starting up</li>
-                  <li>The WebSocket connection hasn't been established yet</li>
+                  <li>- There are no active chats at the moment</li>
+                  <li>- The backend WebSocket service is still starting up</li>
+                  <li>- The WebSocket connection hasn't been established yet</li>
                 </ul>
                 <Typography variant="body2" sx={{ mt: 1 }}>
-                  The data will automatically refresh every 30 seconds.
+                  The data will automatically refresh.
                 </Typography>
               </Alert>
             ) : (
@@ -455,9 +543,19 @@ function KnowledgeBasePage() {
                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 2 }}>
                       {escalationChats.map((chat) => {
                         // Calculate waiting time
-                        const waitingSince = new Date(chat.escalation_requested_at || chat.last_activity);
+                        // Try to use escalation_requested_at first, then fall back to last_activity
+                        let waitingSince;
+                        if (chat.escalation_requested_at) {
+                          waitingSince = new Date(chat.escalation_requested_at);
+                        } else if (chat.last_activity) {
+                          waitingSince = new Date(chat.last_activity);
+                        }
+
                         const now = new Date();
-                        const waitingMinutes = Math.floor((now.getTime() - waitingSince.getTime()) / 60000);
+                        // Only calculate if we have a valid date
+                        const waitingMinutes = waitingSince && !isNaN(waitingSince.getTime())
+                          ? Math.floor((now.getTime() - waitingSince.getTime()) / 60000)
+                          : null; // Use null to indicate we couldn't calculate
 
                         return (
                           <Paper
@@ -486,7 +584,7 @@ function KnowledgeBasePage() {
                                 Started: {new Date(chat.connected_at).toLocaleTimeString()}
                               </Typography>
                               <Typography variant="body2" color="error">
-                                Waiting: {waitingMinutes} min
+                                Waiting: {waitingMinutes !== null ? `${waitingMinutes} min` : 'N/A'}
                               </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -578,22 +676,10 @@ function KnowledgeBasePage() {
               Add Chatbot to Your Website
             </Typography>
             <Typography variant="body1" paragraph>
-              Copy and paste this code into your website's HTML to add the chatbot widget.
-              The widget will automatically connect to your "{indexName}" knowledge base.
+              To add the chatbot widget, copy and paste this code into your website's HTML before the <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: 4 }}>&lt;/body&gt;</code> tag.
+              The widget will automatically connect to your knowledge base.
             </Typography>
             <EmbedSnippet indexName={decodedIndexName} />
-
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'info.50', borderRadius: 1 }}>
-              <Typography variant="subtitle1" color="text.primary" gutterBottom>
-                Quick Tips:
-              </Typography>
-              <ul style={{ margin: '0 0 0 20px', padding: 0, color: 'text.primary' }}>
-                <li>Place this code before the <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: 4 }}>&lt;/body&gt;</code> tag.</li>
-                <li>Paste once and forget - your website will automatically get the latest chatbot version.</li>
-                <li>The widget will automatically connect to your knowledge base</li>
-                <li>The widget inherits your website's colors by default</li>
-              </ul>
-            </Box>
           </Paper>
         </TabPanel>
 

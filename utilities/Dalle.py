@@ -6,15 +6,15 @@ with open("apikey.txt", "r") as f:
     apikey = f.read().strip()
 client = OpenAI(api_key=apikey)
 
-SCRIPT_FILE = "utilities/emulator_script.py"
+SCRIPT_FILE = "emulator_script.py"
 OUTPUT_DIR = "emulator_screenshots"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-user_instructions = "In the emulator window, open edge browser,make it window mode click on a new tab and search for coconuts"
+user_instructions = "In the emulator window, open safari browser,make it window mode click on a new tab and search for coconuts"
 
 # --- Ask GPT‑4o‑mini for automation code ---
 prompt = f"""
-Write a Python script that:
+Write a Python script for MacOS system that:
 1. Uses pyautogui to interact with an emulator window to follow these instructions: {user_instructions}.
 2. Takes a screenshot after each action but just before executing them.
 3. Saves screenshots into the folder '{OUTPUT_DIR}' as step1.png, step2.png, etc.

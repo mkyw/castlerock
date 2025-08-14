@@ -4,21 +4,16 @@ using System.Text;
 using ChatService.Services;
 using ChatService.Middleware;
 using System.Text.Json;
-
-// Model for agent assignment
-public class AssignAgentRequest
-{
-    public string ConnectionId { get; set; } = string.Empty;
-    public string AgentId { get; set; } = string.Empty;
-    public string IndexName { get; set; } = string.Empty;
-}
+using Microsoft.AspNetCore.Builder;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services
 builder.Services.AddLogging();
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ConnectionManager>();
 builder.Services.AddSingleton<ChatService.Services.ChatService>();
+builder.Services.AddHostedService<ConnectionCleanupService>();
 builder.Services.AddAuthorization();
 
 // Add CORS
@@ -69,11 +64,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Add WebSockets
-builder.Services.AddWebSockets(options =>
-{
-    options.KeepAliveInterval = TimeSpan.FromMinutes(2);
-});
+// WebSockets are handled by middleware
 
 var app = builder.Build();
 
@@ -81,9 +72,9 @@ var app = builder.Build();
 app.UseWebSockets();
 app.UseCors();
 
-// Comment out authentication for testing
-// app.UseAuthentication();
-// app.UseAuthorization();
+// Authentication and authorization enabled
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Add WebSocket middleware
 app.UseMiddleware<WebSocketMiddleware>();
@@ -100,7 +91,7 @@ app.MapGet("/api/chat/active", (ConnectionManager connectionManager) =>
     return Results.Ok(connections);
 });
 
-app.MapPost("/api/chat/assign-agent", (AssignAgentRequest request, ConnectionManager connectionManager) =>
+app.MapPost("/api/chat/assign-agent", (dynamic request, ConnectionManager connectionManager) =>
 {
     if (string.IsNullOrEmpty(request.ConnectionId) || 
         string.IsNullOrEmpty(request.AgentId) || 
@@ -131,16 +122,28 @@ app.MapGet("/api/chat/history/{indexName}/{connectionId}", (string indexName, st
     return Results.Ok(history);
 });
 
-app.MapPost("/api/chat/end/{indexName}/{connectionId}", (string indexName, string connectionId, ConnectionManager connectionManager) =>
+app.MapPost("/api/chat/end/{indexName}/{connectionId}", (string indexName, string connectionId, ConnectionManager connectionManager, ILogger<Program> logger) =>
 {
+    logger.LogInformation($"Attempting to end chat for index {indexName}, connection {connectionId}");
+    
+    // Check if this is an agent connection ID
+    string userConnectionId = connectionManager.GetUserConnectionId(connectionId);
+    if (!string.IsNullOrEmpty(userConnectionId))
+    {
+        logger.LogInformation($"Connection {connectionId} is an agent connection for user {userConnectionId}, using user connection ID");
+        connectionId = userConnectionId;
+    }
+    
     if (!connectionManager.ChatExists(indexName, connectionId))
     {
+        logger.LogWarning($"Chat {connectionId} not found for index {indexName}");
         return Results.NotFound($"Chat {connectionId} not found");
     }
     
+    logger.LogInformation($"Ending chat for connection {connectionId}");
     connectionManager.Disconnect(indexName, connectionId);
     return Results.Ok(new { success = true });
 });
 
-Console.WriteLine("Starting ChatService on http://localhost:5000");
-app.Run("http://0.0.0.0:5000"); 
+Console.WriteLine("Starting ChatService on http://localhost:5001");
+app.Run("http://0.0.0.0:5001"); 

@@ -7,6 +7,22 @@
   // Version number - updated by build script
   const VERSION = '1.0.0';
 
+  // Helper function to get primary color
+  function getPrimaryColor(configColor) {
+    if (configColor === 'inherit') {
+      // Try to get CSS variable from parent or document
+      const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--chatbot-primary-color') || 
+                          getComputedStyle(document.documentElement).getPropertyValue('--uwRed');
+      if (computedColor && computedColor.trim() !== '') {
+        return computedColor.trim();
+      } else {
+        // Fallback to a default color if no inherited value is found
+        return '#c5050c'; // UW-Madison red as fallback
+      }
+    }
+    return configColor;
+  }
+
   // Default configuration
   const defaultConfig = {
     // API settings
@@ -20,7 +36,7 @@
       title: 'Castlerock AI',
       placeholder: 'Type your message...',
       sendButtonText: 'Send',
-      primaryColor: '#4a90e2',
+      primaryColor: 'inherit',
       textColor: '#333333',
       backgroundColor: '#ffffff',
       position: 'bottom-right',
@@ -36,7 +52,7 @@
   };
 
   // WebSocket URL
-  const WS_URL = 'ws://localhost:8765';
+  const WS_URL = 'ws://localhost:5001';
 
   // Main widget class
   class ChatbotWidget {
@@ -48,6 +64,7 @@
       this.isOpen = false;
       this.isConnecting = false;
       this.reconnectAttempts = 0;
+      this.isAgentChat = false; // Track if this is an agent chat or AI chat
       this.maxReconnectAttempts = 5;
       this.reconnectInterval = 3000;
       this.initialize();
@@ -162,7 +179,7 @@
       // Header
       const header = document.createElement('div');
       header.style.padding = '15px 20px';
-      header.style.backgroundColor = this.config.ui.primaryColor;
+      header.style.backgroundColor = getPrimaryColor(this.config.ui.primaryColor);
       header.style.color = 'white';
       header.style.display = 'flex';
       header.style.justifyContent = 'space-between';
@@ -230,7 +247,7 @@
       const sendButton = document.createElement('button');
       sendButton.textContent = this.config.ui.sendButtonText;
       sendButton.style.padding = '0 20px';
-      sendButton.style.backgroundColor = this.config.ui.primaryColor;
+      sendButton.style.backgroundColor = getPrimaryColor(this.config.ui.primaryColor);
       sendButton.style.color = 'white';
       sendButton.style.border = 'none';
       sendButton.style.borderRadius = '20px';
@@ -359,6 +376,11 @@
             timestamp: message.timestamp || new Date().toISOString(),
             isSystem: message.type === 'system'
           };
+
+          // Typing indicator functionality removed
+          if (message.type === 'assistant' || message.type === 'system') {
+            console.log('[Chatbot] Typing indicator removal on message disabled');
+          }
         } else {
           // Direct message object
           processedMessage = {
@@ -410,7 +432,7 @@
         messageElement.style.margin = '10px 0';
       } else if (message.isUser) {
         messageElement.style.alignSelf = 'flex-end';
-        messageElement.style.backgroundColor = this.config.ui.primaryColor;
+        messageElement.style.backgroundColor = getPrimaryColor(this.config.ui.primaryColor);
         messageElement.style.color = 'white';
         messageElement.style.borderBottomRightRadius = '4px';
       } else {
@@ -434,12 +456,16 @@
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
 
-    // Helper method to remove typing indicator
+    // Helper method to show typing indicator - functionality removed
+    showTypingIndicator() {
+      // Typing indicator functionality removed
+      console.log('[Chatbot] Typing indicator functionality removed');
+    }
+
+    // Helper method to remove typing indicator - functionality removed
     removeTypingIndicator(typingId) {
-      const typingElement = document.getElementById(typingId);
-      if (typingElement) {
-        typingElement.remove();
-      }
+      // Typing indicator functionality removed
+      console.log('[Chatbot] Remove typing indicator functionality removed');
     }
 
     // Connect to WebSocket
@@ -453,7 +479,20 @@
         this.socket.close();
       }
 
-      const wsUrl = `${WS_URL}/${this.config.indexName || 'default'}`;
+      // Get the origin domain to use as the index name
+      let indexName = this.config.indexName;
+      if (!indexName) {
+        // Try to get the domain from the current page
+        const origin = window.location.hostname;
+        indexName = origin || 'default';
+      }
+
+      // Add authentication token if available
+      let wsUrl = `${WS_URL}/ws/chat/${indexName}`;
+      if (this.authToken) {
+        wsUrl += `?token=${encodeURIComponent(this.authToken)}`;
+      }
+
       console.log(`Connecting to WebSocket: ${wsUrl}`);
 
       try {
@@ -481,7 +520,15 @@
 
             // Handle escalation requests
             if (data.escalation_requested) {
+              this.isAgentChat = true; // Mark this as an agent chat
+              console.log('[Chatbot] Typing indicator removal on escalation disabled');
               this.addSystemMessage('Your request for an agent has been received. Please wait while we connect you.');
+            }
+
+            // Check if this is an agent connection message
+            if (data.content && typeof data.content === 'string' && data.content.includes('Connected to agent')) {
+              this.isAgentChat = true; // Mark this as an agent chat
+              console.log('[Chatbot] Typing indicator removal on agent connection disabled');
             }
           } catch (err) {
             console.error('Error parsing WebSocket message:', err);
@@ -528,6 +575,9 @@
         timestamp: new Date().toISOString()
       };
       this.addMessage(userMessage);
+
+      // Typing indicator functionality removed
+      console.log('[Chatbot] Typing indicator after message send removed');
 
       // Send message via WebSocket if connected
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
