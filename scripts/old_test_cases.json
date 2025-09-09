@@ -1,0 +1,202 @@
+[
+  {
+    "question": "What steps should a student follow to update their email address in the Student Center?",
+    "reference_answer": "To update their email address, a student should log in to MyUW, click on the Student Center tile, then the Profile tile. From the menu on the left, they should select Contact Details. To add an email address, they click on the + sign under Email, and to edit an email address, they click on the > sign. They then select an address type, enter the email address, and click Save."
+  },
+  {
+    "question": "Why is it important for international students to add a Diploma address when updating their contact information?",
+    "reference_answer": "It is important for international students to add a Diploma address because diplomas will be mailed to the Home address unless a specific Diploma address has been provided. Additionally, international diploma mailings are not trackable and can take up to 60 days to arrive, so having a designated address ensures proper delivery."
+  },
+  {
+    "question": "What is the purpose of requesting a temporary passcode in MFA-Duo?",
+    "reference_answer": "The purpose of requesting a temporary passcode in MFA-Duo is to log in when you do not have access to your MFA device. It should not be used as a routine login method."
+  },
+  {
+    "question": "How long does a temporary passcode generated through MFA-Duo remain valid?",
+    "reference_answer": "A temporary passcode generated through MFA-Duo remains valid for 12 hours."
+  },
+  {
+    "question": "Who should students contact to obtain a security key or Duo token/fob?",
+    "reference_answer": "Students should contact the DoIT Help Desk at (608) 264-4357 or email help@doit.wisc.edu to obtain a security key or Duo token/fob."
+  },
+  {
+    "question": "What steps should you take if you are unable to log into MFA due to not having another device or backup codes?",
+    "reference_answer": "If you are unable to log into MFA because you do not have another device set up or a saved list of backup codes, you will need to use a temporary passcode to continue. You can request a temporary passcode as outlined in the MFA-Duo - Request a Temporary Passcode document."
+  },
+  {
+    "question": "How can you reactivate the Duo Mobile App on a new device?",
+    "reference_answer": "To reactivate the Duo Mobile App on a new device, navigate to the UW-Madison MFA Portal, log in with your NetID and password, and click Manage MFA Preferences and Devices. After verifying your identity, select the device you wish to reactivate, click 'I have a new phone', and follow the instructions to download and configure the Duo Mobile App on your new device."
+  },
+  {
+    "question": "What types of support does the DoIT Help Desk provide to the UW-Madison community?",
+    "reference_answer": "The DoIT Help Desk provides support for general computing issues and various UW applications to students, faculty, and staff at UW-Madison. This includes assistance with Windows, Mac OS, Microsoft Office, web browsers, MFA Duo, password resets, and common UW-Madison applications like MyUW and Microsoft 365."
+  },
+  {
+    "question": "How can users contact the DoIT Help Desk for assistance?",
+    "reference_answer": "Users can contact the DoIT Help Desk via phone at 608-264-HELP (4357), email at help@doit.wisc.edu, or through LiveChat from 8:00 AM to 10:00 PM. Additionally, they can access HelpOnline for support requests 24/7, although email responses may take up to 24 hours."
+  },
+  {
+    "question": "What steps must a new UW-Madison faculty or staff member take to activate their NetID if they do not have a Wiscard?",
+    "reference_answer": "A new UW-Madison faculty or staff member without a Wiscard should contact their HR department to obtain either a 10-digit Campus ID number or a 12-digit activation key, which they will then enter on the NetID Account Activation page."
+  },
+  {
+    "question": "Why is it important to avoid activating a second NetID?",
+    "reference_answer": "It is important to avoid activating a second NetID because if you already have an existing NetID, activating a second one could lead to complications. Instead, you should link your new affiliation to your existing NetID by logging in with your current credentials."
+  },
+  {
+    "question": "What information is required to set up account recovery during the NetID activation process?",
+    "reference_answer": "During the NetID activation process, you must set three Account Recovery Questions and provide a Recovery Email address that does not end in wisc.edu. This information is used to reset your password or remind you of your NetID if forgotten."
+  },
+  {
+    "question": "What are the minimum specifications required for a laptop for engineering students at the College of Engineering?",
+    "reference_answer": "The minimum specifications required for a laptop for engineering students at the College of Engineering include Windows 11 as the operating system, a Gen 8 or newer Intel i5 or AMD equivalent processor, 16 GB of RAM, 512+ GB SSD storage, a discrete graphics card, and wireless connectivity of 802.11n or better."
+  },
+  {
+    "question": "Why is it recommended for engineering students to use a Windows laptop instead of a Mac?",
+    "reference_answer": "It is recommended for engineering students to use a Windows laptop because some commonly used engineering programs require Windows to operate, and using a Mac may result in compatibility issues with these programs. Additionally, CAE does not provide support for Apple products, which can lead to challenges in troubleshooting software related issues."
+  },
+  {
+    "question": "Who should use the eduroam wireless network at UW-Madison?",
+    "reference_answer": "Current UW-Madison students, employees, and campus affiliates should use the eduroam wireless network."
+  },
+  {
+    "question": "What steps should a Windows 11 user follow to connect to eduroam?",
+    "reference_answer": "A Windows 11 user should download the eduroam installer using the Configuration Assistant Tool, run the installer, enter their NetID email address and password, and then connect to eduroam through the System Network."
+  },
+  {
+    "question": "Why is eduroam preferred over other Wi-Fi options on the UW-Madison campus?",
+    "reference_answer": "Eduroam is preferred because it provides a secure and reliable connection for students and staff, and it allows users to connect using their existing credentials from other institutions."
+  },
+  {
+    "question": "What are the steps to download the GlobalProtect VPN client if you are not on the UW Madison campus?",
+    "reference_answer": "If you are not on campus and do not have VPN access, you must first use a computer or phone with the VPN already installed to download the ARM64 client. Then, send the file to your ARM computer using email or a content management system. After downloading the file to your ARM computer, you can follow the installation instructions provided."
+  },
+  {
+    "question": "How do you connect to WiscVPN after installing the GlobalProtect client?",
+    "reference_answer": "To connect to WiscVPN, open the Palo Alto GlobalProtect client, enter the WiscVPN portal address 'uwmadison.vpn.wisc.edu', and sign in using your UW Madison NetID and password. After successful login, you will need to verify your identity using MFA-Duo."
+  },
+  {
+    "question": "What should you do if you encounter issues while installing the GlobalProtect VPN client?",
+    "reference_answer": "If you experience issues while installing the GlobalProtect VPN client, it is recommended to try disabling any antivirus software on your machine during the installation process. After completing the installation, remember to re-enable your antivirus."
+  },
+  {
+    "question": "What steps must a student take to change their last Name in Use at UW-Madison after changing their legal last name?",
+    "reference_answer": "A student must first change their legal last name through the Social Security Administration, then update their legal last name in the Student Center. After the legal name change is reflected in the Name in Use app, they can proceed to edit their last name in use."
+  },
+  {
+    "question": "How long may it take for changes to the Name in Use to be reflected across campus applications at UW-Madison?",
+    "reference_answer": "Changes to the Name in Use may take up to 2 hours to appear in MyUW, while updates to other campus applications, including the UW Directory and Office 365 email accounts, may take up to 48 hours."
+  },
+  {
+    "question": "What happens to a user's access to Microsoft 365 services if their affiliation with UW-Madison changes?",
+    "reference_answer": "If a user's affiliation with UW-Madison changes, they will begin to receive a series of 'reduced access' email notifications indicating that their access to Microsoft 365 services will be reduced."
+  },
+  {
+    "question": "What should users do to prepare for a change in their Microsoft 365 access due to an affiliation change?",
+    "reference_answer": "Users should review the services that will change for their account and back up or transfer ownership of their data before the effective date of the change."
+  },
+  {
+    "question": "What are the new email recipient sending limits for Microsoft 365 accounts starting May 12, 2025?",
+    "reference_answer": "Beginning May 12, 2025, all paid faculty and staff accounts will have a limit of 2,000 email recipients per day, while all other types of accounts, including students, emeriti, and affiliates, will have a limit of 500 email recipients per day."
+  },
+  {
+    "question": "What happens if a user exceeds their daily email sending limit?",
+    "reference_answer": "If a user exceeds their daily email sending limit, they will receive a bounce back message and will be placed on Microsoft's block list, preventing them from sending mail until they are removed from the block list."
+  },
+  {
+    "question": "How can a user request a higher sending limit in Microsoft 365?",
+    "reference_answer": "A user can request a higher sending limit by filling out the M365 Email Sending Limits: Exception Request form, which may take up to 5 days to process."
+  },
+  {
+    "question": "What are the initial steps to enroll in a class using the Course Search & Enroll system?",
+    "reference_answer": "To enroll in a class using the Course Search & Enroll system, first log in to Course Search & Enroll, choose a term, and search for the class. Then, select the section(s) that fit your schedule and save the course to your cart."
+  },
+  {
+    "question": "Why might a student encounter validation errors when trying to enroll in a class?",
+    "reference_answer": "A student might encounter validation errors when trying to enroll in a class due to reasons such as not meeting the requisites for the class, needing permission to take the class, or exceeding the number of credits allowed in the term."
+  },
+  {
+    "question": "How can a student add a class directly using its class number?",
+    "reference_answer": "A student can add a class directly using its class number by selecting 'Add by class number' in the search panel, typing the five-digit class number in the pop-up box, selecting 'Check credits', and then selecting 'Add to Cart'."
+  },
+  {
+    "question": "What are the main capabilities of the Google Gemini language model available to UW-Madison Google Workspace users?",
+    "reference_answer": "The Google Gemini language model can engage in informative interactions, provide detailed explanations, generate creative text, assist with tasks like writing emails or code, and help with research by summarizing articles and generating citations."
+  },
+  {
+    "question": "How does the Gemini 2.5 Pro model differ from the Gemini 2.5 Flash model?",
+    "reference_answer": "Gemini 2.5 Pro is more advanced than Gemini 2.5 Flash, as it can handle complex tasks and in-depth reasoning, making it better suited for tasks that require enhanced reasoning, such as coding or mathematics."
+  },
+  {
+    "question": "What is the purpose of applying for graduation at the University of Wisconsin\u2013Madison?",
+    "reference_answer": "The purpose of applying for graduation is to notify your school or college that you plan to complete your degree requirements in a specific term, allowing the staff to begin evaluating your degree accomplishments in preparation for graduation."
+  },
+  {
+    "question": "What steps should a student follow to apply for graduation in the Student Center?",
+    "reference_answer": "To apply for graduation, a student should log in to MyUW, click on the Student Center tile, then the Academic Records tile, select 'Apply for Graduation,' choose the degree for which they are graduating, select the expected graduation term, choose a name for the diploma, select the commencement ceremony, and finally submit the application."
+  },
+  {
+    "question": "What types of devices are known to be incompatible with the UWNet network?",
+    "reference_answer": "Known incompatible devices with the UWNet network include wireless printers, Google Chromecast, smart home devices like Google Home and Amazon Echo, some Smart TVs with cast features, and Wi-Fi extenders that are not approved by the DoIT Help Desk."
+  },
+  {
+    "question": "How can residents of UW-Madison Residence Halls connect devices that are not compatible with UWNet?",
+    "reference_answer": "Residents of the UW-Madison Residence Halls can connect devices that are not compatible with UWNet by using a personal wireless router to create a private local network, allowing them to use their devices normally, although some features may still not function correctly."
+  },
+  {
+    "question": "What are the necessary steps for a guest to connect to the UWNet network?",
+    "reference_answer": "To connect to UWNet as a guest, you need to select the UWNet Wi-Fi network on your device. If the registration page does not appear, open your web browser to be redirected to the UWNet registration page. Enter your Account Username as the NetID and your Guest Password as the password, which you receive when creating a guest account. Finally, accept the Terms of Use and click Log In."
+  },
+  {
+    "question": "Why is eduroam preferred over UWNet for current UW-Madison students and employees?",
+    "reference_answer": "Eduroam is preferred for current UW-Madison students, employees, and campus affiliates because it requires an active UW-Madison NetID, providing a more secure and reliable connection compared to UWNet. For more information about the benefits of eduroam, users can refer to the document titled 'eduroam - End User Benefits.'"
+  },
+  {
+    "question": "What is the purpose of the swap feature in the Course Search & Enroll system?",
+    "reference_answer": "The swap feature allows students to enroll in one class and drop another in one move, which is useful when they do not want to drop a class before enrolling in a new one."
+  },
+  {
+    "question": "What should a student do if they want to be on a waitlist for a new class while remaining enrolled in their current class?",
+    "reference_answer": "If a student wants to be enrolled in their current class and on the waitlist for a new class, they should use the Course Search & Enroll - Add & Enroll in Classes instead of the swap feature."
+  },
+  {
+    "question": "What steps must be taken to export course contents from a Canvas course at UW-Madison?",
+    "reference_answer": "To export course contents from a Canvas course at UW-Madison, navigate to the course, open Settings, select Export Course Content, choose either Quiz or Course to export, and then click Create Export. You will receive an email notification when the export is finished, and you can download the .imscc file from the Content Export page."
+  },
+  {
+    "question": "What should you do if you want to import an .imscc file into another Canvas course?",
+    "reference_answer": "To import an .imscc file into another Canvas course, you should refer to the document titled 'How do I import a Canvas course export package?' from Instructure for detailed instructions."
+  },
+  {
+    "question": "How long do former employees retain access to Workday after leaving the University of Wisconsin?",
+    "reference_answer": "Former employees retain access to Workday for 24 months after their affiliation with the University of Wisconsin ends."
+  },
+  {
+    "question": "What should a former employee do if they need copies of their tax statements after losing access to Workday?",
+    "reference_answer": "Former employees must submit a request using the Duplicate Statement Request Form to obtain copies of their tax statements, such as W-2 or 1042-S."
+  },
+  {
+    "question": "How can a student recover their Campus ID number if they forget it?",
+    "reference_answer": "A student can recover their Campus ID number by logging into MyUW, clicking on the 'Student Center' application, selecting 'Academic Records', and then viewing their 'Unofficial Transcript'. The Campus ID number will be bolded in the top left of the transcript."
+  },
+  {
+    "question": "What should applicants do if they need their Campus ID number?",
+    "reference_answer": "Applicants should refer to the letter from the Admissions Office or the email titled 'UW-Madison Application Confirmation' to find their Campus ID number. If they cannot find it, they should contact the appropriate Admissions office for assistance."
+  },
+  {
+    "question": "What steps should you follow to reset your forgotten NetID password?",
+    "reference_answer": "To reset your forgotten NetID password, go to the Account Recovery tool at https://www.mynetid.wisc.edu/recover, enter your NetID and date of birth, and if applicable, your Wiscard number and issue code. Then, answer your security questions, click Next, and follow the instructions to receive a password reset link via email. Enter a new password that meets the criteria provided, and click Next to complete the process."
+  },
+  {
+    "question": "What should you do if you do not remember your NetID?",
+    "reference_answer": "If you do not remember your NetID, you can click 'I don't know my NetID' on the Account Recovery tool page to receive assistance in recovering it."
+  },
+  {
+    "question": "What is the primary purpose of the WiscVPN service at the University of Wisconsin-Madison?",
+    "reference_answer": "The primary purpose of the WiscVPN service is to allow remote users to connect to University of Wisconsin-Madison resources when they are not connected to the Campus Network."
+  },
+  {
+    "question": "Who is eligible to access WiscVPN and what happens when they are no longer part of an eligible group?",
+    "reference_answer": "Eligible users for WiscVPN access include current UW-Madison students, future enrolled students, current employees, active student employees, and certain affiliates. Users will lose VPN access once they are no longer a member of any of these eligible populations, with no grace period for retaining services."
+  }
+]

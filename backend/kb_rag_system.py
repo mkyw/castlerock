@@ -17,8 +17,8 @@ from dotenv import load_dotenv
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
-from pinecone_service import PineconeService
-from utils.document_processor import DocumentProcessor, SUPPORTED_DOCUMENT_EXTENSIONS
+from backend.pinecone_service import PineconeService
+from backend.utils.document_processor import DocumentProcessor, SUPPORTED_DOCUMENT_EXTENSIONS
 
 # Import OpenAI at the top level
 try:
@@ -49,8 +49,16 @@ CONFIG = {
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from project root once at import
+try:
+    _PROJECT_ENV = (Path(__file__).resolve().parents[1] / ".env")
+    load_dotenv(dotenv_path=_PROJECT_ENV, override=False)
+except Exception:
+    # Fall back to default lookup if specific path fails
+    try:
+        load_dotenv()
+    except Exception:
+        pass
 
 # Suppress tokenizer parallelism warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -79,8 +87,19 @@ class KBScraper:
                 chunk_size=1000,
                 chunk_overlap=200
             )
+            # Cache Gemini credentials and model once
+            self.gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+            self.gemini_model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
             self.gemini_model = None
-            self.gemini_model_name = None
+            self._genai = None
+            if self.gemini_api_key:
+                try:
+                    import google.generativeai as genai  # type: ignore
+                    genai.configure(api_key=self.gemini_api_key)
+                    self._genai = genai
+                    self.gemini_model = genai.GenerativeModel(self.gemini_model_name)
+                except Exception as _e:
+                    logger.error(f"Failed to initialize Gemini model: {_e}")
             
             # Initialize Pinecone service and embeddings with the specified index name
             self.pinecone = PineconeService(user_id=user_id, index_name=index_name)
@@ -834,14 +853,14 @@ class KBScraper:
             return {"status": "error", "message": f"Failed to process PDF: {str(e)}"}
     
     async def query(self, query: str, k: int = 5, conversation_history: Optional[List[Dict[str, str]]] = None, context_documents: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Query the knowledge base using OpenAI first, then fall back to Gemini if needed
+        """Query the knowledge base using Gemini by default, with OpenAI as fallback.
         
         Args:
             query: The query string
             k: Number of results to return
             conversation_history: Optional list of previous messages in the conversation
             context_documents: Optional list of context documents to include
-            
+        
         Returns:
             Dict with status, answer, and optional error fields
         """
@@ -874,99 +893,97 @@ class KBScraper:
                     conversation_context += f"{role.capitalize()}: {content}\n"
                 conversation_context += "\n"
             
-            # First try OpenAI as the primary option
-            print("Trying OpenAI as primary option...")
-            openai_api_key = os.getenv("OPENAI_API_KEY")
-            if openai_api_key:
+            # Primary (and only): Gemini
+            # Build the Gemini prompt once
+            gemini_prompt = f"""You are a knowledgeable support agent working for the organization. 
+            Consider the following passages now a part of your personal knowledge base.
+            
+            Your task has TWO steps:
+            1. Identify which passages are most relevant to the user’s question.
+            - Consider accuracy, specificity, and directness.
+            
+            2. Using the most relevant passages, write a clear, professional, and confident answer to the user’s question.
+            However, if the answer is not directly in the context, infer as much as you can from the provided passages and search through your own general knowledge, 
+            and offer the best possible solution
+            - Mirror the language style of the passages where possible.
+            - Be concise and direct: include only as much detail as needed to resolve the issue.
+            {context}
+            
+            {conversation_context}
+            
+            Question: {query}
+            
+            As the frontline support agent, your goal is to resolve the user’s issue with clarity, kindness, and authority. 
+            """
+            
+            print("[RAG] Trying Gemini as primary option...")
+            if self.gemini_api_key and self.gemini_model is not None:
                 try:
-                    # Use the imported AsyncOpenAI
-                    client = AsyncOpenAI(api_key=openai_api_key)
-                    
-                    # Format the prompt for OpenAI
-                    openai_prompt = f"""You are a knowledgeable support agent working for the organization that has provided you with the following context as your own personal expertise.
-            
-                        Context:
-                        {context}
-                        
-                        {conversation_context}
-                        
-                        Question: {query}
-
-                        As the frontline support agent, your primary goal is to resolve the user's issue as quickly and efficiently as possible.
-                        Your users want a quick solution to their problem, without reading a lot of text.
-                        When users ask a new question, always provide only the most direct solution possible in 50 words or less.
-                        If the user continues to ask for clarification, then provide a more detailed response, while still keeping it around 50 words.
-
-                        You are also representing the organization. Be kind, professional, and patient at all times.
-                        Speak with clarity, authority, and confidence — your tone should instill trust. Do not use words like "maybe," "possibly," "I think," or "it appears."
-
-                        Keep your language at an eighth grade reading level -- you may be speaking with customers that have little domain or technical knowledge.
-
-                        If a question involves a tool or link, provide the direct URL hyperlinked.
-
-                        If the answer is directly in the context, respond clearly based on that information, with only as much detail as necessary to resolve the user's problem.
-
-                        If the answer is not directly in the context, infer from context, use your own general knowledge, and compare the issue with similar scenarios to offer the best possible solution — never say "I don't know."""
-                    
-                    # Try models in order of preference
-                    models_to_try = ["gpt-4o-mini", "gpt-3.5-turbo"]
-                    last_openai_error = None
-                    
-                    for model in models_to_try:
-                        try:
-                            print(f"Trying OpenAI model: {model}")
-                            response = await client.chat.completions.create(
-                                model=model,
-                                messages=[
-                                    {"role": "system", "content": "You are a helpful assistant that provides accurate and concise answers."},
-                                    {"role": "user", "content": openai_prompt}
-                                ],
-                                max_tokens=1000,
-                                temperature=0.7
-                            )
-                            
-                            answer = response.choices[0].message.content.strip()
-                            
-                            return {
-                                "status": "success",
-                                "answer": answer,
-                                "sources": sources,
-                                "model_used": f"openai/{model}"
-                            }
-                            
-                        except Exception as e:
-                            last_openai_error = e
-                            print(f"Error with OpenAI model {model}: {e}")
-                            continue
-                            
-                    # If we get here, all OpenAI models failed
-                    print(f"All OpenAI models failed. Last error: {last_openai_error}")
-                    # Don't fall back to Gemini, return the error
-                    raise last_openai_error
-                    
+                    print(f"[RAG][LLM] Querying Gemini with question: {query}")
+                    print(f"[RAG][LLM] Gemini model: {self.gemini_model_name}")
+                    import asyncio as _asyncio
+                    def _gen_content():
+                        return self.gemini_model.generate_content(
+                            gemini_prompt,
+                            generation_config={
+                                "temperature": 0.2,
+                                "max_output_tokens": 4096,
+                                "response_mime_type": "text/plain",
+                            },
+                        )
+                    resp = await _asyncio.to_thread(_gen_content)
+                    # Safely extract text
+                    answer = ""
+                    try:
+                        candidates = getattr(resp, "candidates", None)
+                        if candidates:
+                            for c in candidates:
+                                content = getattr(c, "content", None)
+                                parts = getattr(content, "parts", []) if content else []
+                                for p in parts:
+                                    t = getattr(p, "text", None)
+                                    if t:
+                                        answer += t
+                        # If still empty, check prompt_feedback for block reason
+                        if not answer:
+                            # Debug finish reasons when empty
+                            try:
+                                fins = [getattr(c, "finish_reason", None) for c in (candidates or [])]
+                                print(f"[RAG][Gemini] finish_reasons: {fins}")
+                            except Exception:
+                                pass
+                            # Last resort, try quick accessor
+                            try:
+                                quick = getattr(resp, "text", None)
+                                if isinstance(quick, str) and quick.strip():
+                                    answer = quick
+                            except Exception:
+                                pass
+                            prompt_feedback = getattr(resp, "prompt_feedback", None)
+                            if prompt_feedback and getattr(prompt_feedback, "block_reason", None):
+                                answer = f"[Gemini blocked: {prompt_feedback.block_reason}]"
+                    except Exception:
+                        answer = ""
+                    answer = (answer or "").strip()
+                    if answer:
+                        return {
+                            "status": "success",
+                            "answer": answer,
+                            "sources": sources,
+                            "model_used": f"gemini/{self.gemini_model_name}"
+                        }
                 except Exception as e:
-                    print(f"OpenAI API error: {e}")
-                    # Return error message directly instead of falling back
-                    return {
-                        "status": "error",
-                        "answer": f"An error occurred while processing your query with OpenAI: {str(e)}",
-                        "sources": sources
-                    }
+                    logger.error(f"Gemini error: {e}")
+                    return {"status": "error", "answer": f"Gemini error: {e}", "sources": sources}
             else:
-                print("No OpenAI API key found in environment variables")
-                return {
-                    "status": "error",
-                    "answer": "OpenAI API key is not configured. Please add your OpenAI API key to the environment variables.",
-                    "sources": sources
-                }
-            
+                print("No LLM provider configured. Please set GEMINI_API_KEY/GOOGLE_API_KEY.")
+                return {"status": "error", "answer": "No LLM provider configured. Please set GEMINI_API_KEY/GOOGLE_API_KEY.", "sources": sources}
         except Exception as e:
             error_time = time.time() - start_time
             print(f"\n=== Error in Query ===")
             print(f"Error: {str(e)}")
             print(f"Error occurred after {error_time:.2f}s")
             print("=======================\n")
-            
             return {
                 "status": "error",
                 "answer": f"An error occurred while processing your query: {str(e)}",

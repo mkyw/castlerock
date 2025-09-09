@@ -8,7 +8,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pinecone import Pinecone, ServerlessSpec, NotFoundException
 
 # Local imports
-from utils.index_utils import generate_index_name, get_user_indices
+from backend.utils.index_utils import generate_index_name, get_user_indices
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -228,7 +228,7 @@ class PineconeService:
             batch = vectors[i:i+100]
             self.index.upsert(vectors=batch)
     
-    async def query_batch(self, queries: List[str], k: int = 5, batch_size: int = 10) -> List[List[Dict[str, Any]]]:
+    async def query_batch(self, queries: List[str], k: int = 15, batch_size: int = 10) -> List[List[Dict[str, Any]]]:
         """
         Query the Pinecone index with multiple queries in parallel batches.
         
@@ -283,7 +283,7 @@ class PineconeService:
         
         return all_results
     
-    async def query(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+    async def query(self, query: str, k: int = 15) -> List[Dict[str, Any]]:
         """
         Query the Pinecone index with a single query.
         

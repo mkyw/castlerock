@@ -26,7 +26,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Token expiration time in minutes
 
 # Local imports
 from auth import get_current_user, TokenData
-from kb_rag_system import KBScraper
+from backend.kb_rag_system import KBScraper
+from backend.pinecone_service import PineconeService
 from utils.index_utils import (
     generate_index_name, 
     get_user_indices_util, 

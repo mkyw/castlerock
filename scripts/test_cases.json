@@ -1,0 +1,202 @@
+[
+  {
+    "question": "I'm a graduating student who still needs VPN access for a month to finish some research. What options do I have?",
+    "reference_answer": "You can request temporary VPN access from the DoIT Help Desk for up to one month.  If you need longer-term access (more than a month), you will need to work with your local HR department to get added as a Person of Interest (POI) in HRS."
+  },
+  {
+    "question": "What is the preferred Wi-Fi network for current UW-Madison students and employees?",
+    "reference_answer": "eduroam"
+  },
+  {
+    "question": "As a UW Madison student, I'm trying to connect to eduroam.  If I run into trouble after installing the eduroam profile, what troubleshooting steps are recommended?",
+    "reference_answer": "If you have trouble accessing eduroam after installation, you may need to perform a network reset.  To do this, open your computer's Settings, go to Network & internet, then Advanced network settings, and finally Network reset. Click \"Reset now\" and your computer will restart. After restarting, try connecting to eduroam again using your NetID email address (NetID@wisc.edu) and password."
+  },
+  {
+    "question": "What are the username and password requirements for connecting to the eduroam network at UW Madison?",
+    "reference_answer": "Your eduroam username is your NetID email address (NetID@wisc.edu), and your eduroam password is your NetID password.  It is crucial to include the \"@wisc.edu\" portion of your email address for the username; omitting it will prevent successful login."
+  },
+  {
+    "question": "How long is a temporary Duo passcode valid for?",
+    "reference_answer": "A temporary passcode expires after 12 hours."
+  },
+  {
+    "question": "Who should I contact if I need help getting a security key for Duo?",
+    "reference_answer": "Students should contact the DoIT Help Desk at (608) 264-4357 or email help@doit.wisc.edu.  Students with disabilities can also contact the McBurney Disability Resource Center. Faculty, staff, and researchers should contact their Human Resources Office or IT department, or the DoIT Help Desk."
+  },
+  {
+    "question": "What phone number should I call if I need help with my Bucky Backup account?",
+    "reference_answer": "To receive help with Bucky Backup, you should call 608-264-HELP (4357) and select Option 2 for Enterprise Support services."
+  },
+  {
+    "question": "If I need help with a software license, what option should I choose when calling the DoIT Help Desk?",
+    "reference_answer": "If you have questions about a software license, you should call 608-264-HELP (4357) and select Option 6 to inquire about a previous order or software licenses."
+  },
+  {
+    "question": "If my department provides me with a computer, who should I contact to get Microsoft Office installed?",
+    "reference_answer": "If you are on a departmental managed computer, contact your departmental IT support staff to ensure the correct version of Microsoft Office is installed."
+  },
+  {
+    "question": "Why should I use the Microsoft 365 Apps for Enterprise/ProPlus/Subscription version instead of an older version?",
+    "reference_answer": "The Microsoft 365 Apps for Enterprise/ProPlus/Subscription version receives feature and security updates, unlike Microsoft versions 2021/Volume License which only receive security updates."
+  },
+  {
+    "question": "What should I do if I encounter issues installing WiscVPN, and what steps should I take after a successful installation?",
+    "reference_answer": "If you have trouble installing WiscVPN, try disabling your antivirus software temporarily, then re-enable it after installation.  Reboot your computer after installation before attempting to connect to WiscVPN."
+  },
+  {
+    "question": "If my professor uses the Top Hat-Canvas integration, how do I join the course?",
+    "reference_answer": "If your instructor uses the Top Hat-Canvas integration, you will not use a join code. Instead, after creating your Top Hat account, go to your course's Canvas site and click on the Top Hat link in Canvas."
+  },
+  {
+    "question": "What login information will I use to access Top Hat after I set up my account?",
+    "reference_answer": "Going forward, you will use your UW-Madison NetID login credentials to access Top Hat at https://app.tophat.com/login"
+  },
+  {
+    "question": "What should I do if I already have a NetID but need to link it to my new affiliation at UW Madison?",
+    "reference_answer": "If you already have a NetID, click the link in the message at the top of the activation page.  You will then log in with your existing NetID and password to link your new affiliation."
+  },
+  {
+    "question": "Why would a student need to use the \"swap\" feature in Course Search & Enroll instead of simply adding and dropping classes?",
+    "reference_answer": "Swapping classes is useful when you don't want to drop a class before enrolling in a new class; for example, if you've already enrolled for your maximum allowed credits, you can't add another class without dropping some credits first.  The swap feature ensures eligibility for the new class before dropping the old one."
+  },
+  {
+    "question": "How do I update my home email address in the Student Center?",
+    "reference_answer": "Log in to MyUW, click the Student Center and then the Profile tile.  Select Contact Details from the left menu. To edit, click the > sign next to the email address.  Select \"Home\" as the address type, enter your new email address, and click Save. If you acquire a wisc.edu account later, that address will automatically become your preferred email."
+  },
+  {
+    "question": "How long does it typically take for my updated name to show up across all campus systems after I submit the change in MyUW?",
+    "reference_answer": "It may take up to 2 hours for your changes to appear in MyUW. Changes to other campus applications may take up to 48 hours, including the UW Directory and Office 365 email accounts."
+  },
+  {
+    "question": "If I want to change my last name in use, but it's different from my legal name, what's the procedure I need to follow?",
+    "reference_answer": "Students must first change their legal last name through the Social Security Administration and then in Student Center.  After the legal name change appears in the Name in Use app, you can edit your last name in use; however, only capitalization, spacing, apostrophes, or hyphens are allowed. Any other changes will result in an error message."
+  },
+  {
+    "question": "What restrictions are there on changing the last name in use for students at UW-Madison?",
+    "reference_answer": "Students can only change capitalization, spacing, apostrophes, or hyphens in their last name in use, and any other changes will result in an error message."
+  },
+  {
+    "question": "How do I find the deadline to drop a class without it appearing on my transcript?",
+    "reference_answer": "To drop a class without it appearing on your transcript, you must drop it before the \"DR/W Transcript Notation Date\" listed in the session dates and deadlines for your course.  This information is found in the info section of your course section."
+  },
+  {
+    "question": "What happens if I apply for graduation but then decide to change my graduation term?",
+    "reference_answer": "You may change your graduation term after initially applying; however, be aware of the relevant deadlines for making such changes.  Also note that applying for graduation in a specific term prevents enrollment in subsequent terms."
+  },
+  {
+    "question": "I'm a junior with 86 credits but haven't declared a major yet. Will I be prevented from registering for next semester's classes?",
+    "reference_answer": "Yes, if you have 86 or more combined in-progress and completed credits and have not declared a major by the 5th week of the fall or spring term, an enrollment hold will be placed on your record, preventing you from enrolling in future terms until you declare a major or consult your academic advisor."
+  },
+  {
+    "question": "What should I do if I can't declare a major because I don't meet the requirements yet?",
+    "reference_answer": "If you cannot declare a major because you do not qualify yet or have another issue preventing you from declaring a major, you should speak with your current academic advisor as soon as possible about your options."
+  },
+  {
+    "question": "If I can't log in to MFA because I don't have another device set up or backup codes, how can I proceed with reactivating Duo Mobile?",
+    "reference_answer": "You will need to use a temporary passcode to continue.  To obtain one, refer to the instructions in \"MFA-Duo - Request a Temporary Passcode.\" Alternatively, you can call the DoIT Help Desk at 608-264-HELP (4357) to request a bypass code."
+  },
+  {
+    "question": "What should I do if I'm unable to get a temporary passcode and have no other backup options for Duo Mobile reactivation?",
+    "reference_answer": "You will need to contact the DoIT Help Desk at 608-264-HELP (4357) to request a bypass code."
+  },
+  {
+    "question": "Why would I need to use a VPN to access SSCC network resources?",
+    "reference_answer": "A VPN allows you to connect to the SSCC network as if you were physically in the building, giving you access to network drives, printers, and services restricted to UW IP addresses.  It also encrypts your network traffic for privacy."
+  },
+  {
+    "question": "How do I add a new VPN portal in GlobalProtect?",
+    "reference_answer": "To add a new portal, open the GlobalProtect panel, click the menu icon, then click 'Settings', 'Add', enter the new portal address, and click 'Save'."
+  },
+  {
+    "question": "How can I get started using Canvas at UW Madison?",
+    "reference_answer": "To get started with Canvas, see Canvas - Getting Started [UW-Madison]."
+  },
+  {
+    "question": "What types of non-credit courses can I create using Canvas?",
+    "reference_answer": "Five types of noncredit courses are available: Sandbox, Continuing Studies/Lifelong Learning (L3), Compliance/Institutional Training, Supplemental, and Blueprint."
+  },
+  {
+    "question": "What types of non-credit courses can I create in Canvas?",
+    "reference_answer": "Five types of noncredit courses are available: Sandbox, Continuing Studies/Lifelong Learning (L3), Compliance/Institutional Training, Supplemental, and Blueprint."
+  },
+  {
+    "question": "Why can't I get help with my NetID login problem through email or chat?",
+    "reference_answer": "For security reasons, NetID login issues cannot be resolved via email or chat; you must call or visit the DoIT Help Desk."
+  },
+  {
+    "question": "What should I do if I'm having trouble logging into a computer lab using my NetID?",
+    "reference_answer": "If you are in a computer lab and having NetID login problems, contact the lab's support staff for assistance, as you may not have the privileges to perform troubleshooting steps listed for other situations."
+  },
+  {
+    "question": "If I withdraw from the university, what offices will review my request before it's processed?",
+    "reference_answer": "Your withdrawal request will be reviewed by your academic dean before being sent to the Office of the Registrar to be processed."
+  },
+  {
+    "question": "What happens after my academic dean approves my withdrawal request?",
+    "reference_answer": "After your academic dean approves your request, it is sent to the Office of the Registrar to complete the process.  You will receive a confirmation email when you have been officially withdrawn."
+  },
+  {
+    "question": "If I'm a student who is not a UW employee, what are the guidelines for submitting expense reimbursements?",
+    "reference_answer": "Students who are not also UW employees are exempt from the 90-day requirement for submitting expense reimbursements."
+  },
+  {
+    "question": "To whom should my supervisor submit the Supervisor Incident Analysis and Prevention Report after an employee injury?",
+    "reference_answer": "The supervisor must submit the Supervisor Incident Analysis and Prevention Report to hr@extension.wisc.edu within one workday of learning about the employee's work-related injury or illness."
+  },
+  {
+    "question": "What are some workarounds for students experiencing problems viewing images in Canvas?",
+    "reference_answer": "Students should ensure they are using the latest versions of Chrome or Firefox, clear their browser cache and cookies, and disable ad-blocking software.  Safari users should check their cross-site protection settings; on iOS, this is found in Settings > Apps > Safari.  Instructors can try compressing large images or re-uploading them, or hosting backup images on UW-Madison Box and providing a link in Canvas."
+  },
+  {
+    "question": "How do I access SpectrumU on my phone if I haven't installed the app yet?",
+    "reference_answer": "The provided text directs you to a separate page for instructions on installing the SpectrumU app."
+  },
+  {
+    "question": "If the SpectrumU app freezes on my Android, what troubleshooting steps should I take?",
+    "reference_answer": "If the app freezes on a black screen with the Charter logo, you should kill the app by holding down the Home button, swiping the SpectrumU window off the screen, and then relaunching the app."
+  },
+  {
+    "question": "How can I add a recovery email address to my NetID account?",
+    "reference_answer": "To add or change your recovery email address, use the NetID Account Modification tool at https://www.mynetid.wisc.edu/modify.  After entering your new recovery email, click the Modify Account button to save changes.  You'll then receive a confirmation email."
+  },
+  {
+    "question": "If I've forgotten my NetID password, what steps should I take to regain access to my account?",
+    "reference_answer": "If you've forgotten your password, you should follow the instructions in the NetID Account Recovery (Password Reset) guide."
+  },
+  {
+    "question": "I was enrolled at UW Madison in Fall 2022 but haven't been enrolled since. Do I need to reapply?",
+    "reference_answer": "Yes, anyone who has not been enrolled for one term or more, excluding summer, must reapply."
+  },
+  {
+    "question": "If my previous major is no longer offered, what should I do?",
+    "reference_answer": "Your reentry application will be referred to your academic dean, and you should work with them to discuss which currently offered major(s) best fit your needs."
+  },
+  {
+    "question": "If I want to pursue a second undergraduate degree, how do I apply?",
+    "reference_answer": "To complete a second undergraduate degree, you must apply through the UW System electronic application at apply.wisconsin.edu."
+  },
+  {
+    "question": "What are the deadlines for submitting a reentry application for the different terms?",
+    "reference_answer": "Requests for reentry are available beginning December 1 for summer and fall applications or August 1 for spring applications."
+  },
+  {
+    "question": "If I'm waitlisted for a class, will I receive an email notification if I get a spot?",
+    "reference_answer": "Once a department determines that you will be allowed to enroll for the section, you will receive an email notifying you of this and how long your permission will be valid."
+  },
+  {
+    "question": "How can undergraduate students manage their wait listed classes during the Fall and Spring terms?",
+    "reference_answer": "Undergraduate students can be on up to 18 credits of wait listed classes."
+  },
+  {
+    "question": "I want to drop a class I'm waitlisted for. How do I do that?",
+    "reference_answer": "Use the Drop function within Course Search & Enroll."
+  },
+  {
+    "question": "What should you do if you cannot log into MFA due to not having another device or backup codes?",
+    "reference_answer": "You will need to use a temporary passcode to continue."
+  },
+  {
+    "question": "What is required to activate your NetID account if you are a new UW-Madison faculty or staff member without a Wiscard?",
+    "reference_answer": "You must contact your HR department to obtain either a 10-digit Campus ID number or a 12-digit activation key."
+  }
+]
